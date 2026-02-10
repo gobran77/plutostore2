@@ -2,29 +2,12 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { Package, Tag, ChevronDown, ChevronUp, ShoppingCart } from 'lucide-react';
 import { getCurrencySymbol } from '@/types/currency';
-import type { Json } from '@/integrations/supabase/types';
 import { ServiceOrderModal } from './ServiceOrderModal';
+import type { Service as LegacyService } from '@/types/services';
 
-interface ServicePricing {
-  periodDays: number;
-  periodName: string;
-  buyPrice: number;
-  sellPrice: number;
-  currency: string;
-}
-
-interface Service {
-  id: string;
-  name: string;
-  description: string | null;
-  default_type: string;
-  pricing: ServicePricing[];
-  is_active: boolean;
-  image_url: string | null;
-}
+type Service = LegacyService & { image_url?: string | null };
 
 interface CustomerBalances {
   balance_sar: number;
@@ -39,21 +22,6 @@ interface CustomerSession {
   balance: number;
   currency: string;
   balances?: CustomerBalances;
-}
-
-// Helper to parse pricing from JSON
-function parsePricing(pricing: Json): ServicePricing[] {
-  if (!Array.isArray(pricing)) return [];
-  return pricing.map((p) => {
-    const item = p as Record<string, unknown>;
-    return {
-      periodDays: Number(item.periodDays) || 0,
-      periodName: String(item.periodName || ''),
-      buyPrice: Number(item.buyPrice) || 0,
-      sellPrice: Number(item.sellPrice) || 0,
-      currency: String(item.currency || 'SAR'),
-    };
-  });
 }
 
 export function ServicesSection() {
@@ -81,25 +49,17 @@ export function ServicesSection() {
 
   const fetchServices = async () => {
     try {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-
-      const parsedServices: Service[] = (data || []).map(service => ({
-        ...service,
-        default_type: service.default_type || 'shared',
-        is_active: service.is_active ?? true,
-        pricing: parsePricing(service.pricing),
-        image_url: (service as any).image_url || null,
+      const raw = localStorage.getItem('app_services');
+      const parsed = raw ? JSON.parse(raw) : [];
+      const list = Array.isArray(parsed) ? parsed : [];
+      const servicesWithDates: Service[] = list.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt ? new Date(s.createdAt) : new Date(),
       }));
-
-      setServices(parsedServices);
+      setServices(servicesWithDates);
     } catch (err) {
       console.error('Error fetching services:', err);
+      setServices([]);
     } finally {
       setIsLoading(false);
     }
@@ -162,9 +122,9 @@ export function ServicesSection() {
       <CardContent className="space-y-3">
         {services.map((service) => {
           const isExpanded = expandedService === service.id;
-          const activePricing = service.pricing.filter(p => p.sellPrice > 0);
+          const activePricing = (service.pricing || []).filter((p) => (p as any).sellPrice > 0);
           const lowestPrice = activePricing.length > 0 
-            ? Math.min(...activePricing.map(p => p.sellPrice))
+            ? Math.min(...activePricing.map((p: any) => p.sellPrice))
             : null;
 
           return (
@@ -204,7 +164,7 @@ export function ServicesSection() {
                   {lowestPrice !== null && (
                     <Badge variant="secondary" className="flex items-center gap-1">
                       <Tag className="w-3 h-3" />
-                      يبدأ من {lowestPrice} {getCurrencySymbol(activePricing[0]?.currency || 'SAR')}
+                      يبدأ من {lowestPrice} {getCurrencySymbol((activePricing[0] as any)?.currency || 'SAR')}
                     </Badge>
                   )}
                   {isExpanded ? (
@@ -228,20 +188,20 @@ export function ServicesSection() {
                         className="bg-card border rounded-lg p-3 text-center"
                       >
                         <p className="text-xs text-muted-foreground mb-1">
-                          {pricing.periodName}
+                          {(pricing as any).periodName}
                         </p>
                         <p className="text-lg font-bold text-primary">
-                          {pricing.sellPrice}
+                          {(pricing as any).sellPrice}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {getCurrencySymbol(pricing.currency)}
+                          {getCurrencySymbol((pricing as any).currency)}
                         </p>
                       </div>
                     ))}
                   </div>
                   <div className="flex items-center justify-between mt-3">
-                    <Badge variant={service.default_type === 'shared' ? 'default' : 'secondary'}>
-                      {service.default_type === 'shared' ? 'حساب مشترك' : 'حساب خاص'}
+                    <Badge variant={service.defaultType === 'shared' ? 'default' : 'secondary'}>
+                      {service.defaultType === 'shared' ? 'حساب مشترك' : 'حساب خاص'}
                     </Badge>
                     <Button 
                       size="sm" 
