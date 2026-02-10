@@ -163,17 +163,18 @@ export default function CustomerLogin() {
         .update({ is_activated: true })
         .eq('id', pendingCustomer.id);
 
-      // Store customer session and navigate
-      localStorage.setItem('customer_session', JSON.stringify({
-        id: pendingCustomer.id,
-        name: pendingCustomer.name,
-        whatsapp_number: pendingCustomer.whatsapp_number,
-        balance: pendingCustomer.balance,
-        currency: pendingCustomer.currency,
-      }));
-      
-      toast.success(`مرحباً ${pendingCustomer.name}!`);
-      navigate('/customer/dashboard');
+        // Store customer session and navigate
+        localStorage.setItem('customer_session', JSON.stringify({
+          id: pendingCustomer.id,
+          name: pendingCustomer.name,
+          whatsapp_number: pendingCustomer.whatsapp_number,
+          balance: pendingCustomer.balance,
+          currency: pendingCustomer.currency,
+          activation_code: pendingCustomer.activation_code,
+        }));
+        
+        toast.success(`مرحباً ${pendingCustomer.name}!`);
+        navigate('/customer/dashboard');
     } catch (err) {
       console.error('Activation error:', err);
       toast.error('حدث خطأ أثناء تسجيل الدخول');

@@ -41,6 +41,7 @@ interface CustomerSession {
   balance: number;
   currency: string;
   balances: CustomerBalances;
+  activation_code?: string;
 }
 
 interface Subscription {
@@ -182,6 +183,29 @@ export default function CustomerDashboard() {
 
   const fetchSubscriptions = async (customerId: string) => {
     try {
+      // Prefer edge function so customers can load their subscriptions even if RLS blocks direct table access.
+      const sessionRaw = localStorage.getItem('customer_session');
+      if (sessionRaw) {
+        try {
+          const sess = JSON.parse(sessionRaw) as any;
+          const activation_code = typeof sess?.activation_code === 'string' ? sess.activation_code : '';
+          const whatsapp_number = typeof sess?.whatsapp_number === 'string' ? sess.whatsapp_number : '';
+
+          if (activation_code && whatsapp_number) {
+            const { data: fnData, error: fnErr } = await supabase.functions.invoke('get-customer-subscriptions', {
+              body: { customer_id: customerId, whatsapp_number, activation_code },
+            });
+
+            if (!fnErr && fnData?.success && Array.isArray(fnData?.subscriptions)) {
+              setSubscriptions(fnData.subscriptions as Subscription[]);
+              return;
+            }
+          }
+        } catch {
+          // ignore session parse errors
+        }
+      }
+
       const { data, error } = await supabase
         .from('customer_subscriptions')
         .select('*, service_slots(email, password, slot_name, updated_at)')
