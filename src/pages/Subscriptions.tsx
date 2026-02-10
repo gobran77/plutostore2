@@ -245,7 +245,7 @@ const Subscriptions = () => {
   };
 
   const handleAddSubscription = async (subscriptionData: Omit<Subscription, 'id' | 'status'>) => {
-    const newSubscription: Subscription = {
+    let newSubscription: Subscription = {
       ...subscriptionData,
       id: Date.now().toString(),
       status: 'active',
@@ -278,6 +278,27 @@ const Subscriptions = () => {
         console.error('Error saving subscription to database:', error);
         toast.error('حدث خطأ في حفظ الاشتراك');
         return;
+      }
+
+      // For shared subscriptions, fetch slot credentials once and store them locally for the customer portal.
+      if (subscriptionData.subscriptionType === 'shared' && subscriptionData.slotId) {
+        const { data: slotData, error: slotErr } = await supabase
+          .from('service_slots')
+          .select('id, email, password, slot_name, updated_at')
+          .eq('id', subscriptionData.slotId)
+          .maybeSingle();
+
+        if (!slotErr && slotData) {
+          newSubscription = {
+            ...newSubscription,
+            loginEmail: slotData.email || undefined,
+            loginPassword: slotData.password || undefined,
+            loginSlotName: slotData.slot_name || undefined,
+            loginUpdatedAt: slotData.updated_at || undefined,
+          };
+        } else if (slotErr) {
+          console.error('Error fetching slot credentials:', slotErr);
+        }
       }
 
       // If payment is deferred, deduct the amount from customer balance (make it negative/debt).

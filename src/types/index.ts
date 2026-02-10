@@ -65,6 +65,12 @@ export interface Subscription {
   subscriptionType?: 'private' | 'shared';
   accountType?: string;
   slotId?: string;
+  // Stored (optional) login details for shared subscriptions.
+  // Useful when the customer portal can't fetch service_slots due to RLS, and as a local fallback.
+  loginEmail?: string;
+  loginPassword?: string;
+  loginSlotName?: string;
+  loginUpdatedAt?: string;
 }
 
 // Invoice types

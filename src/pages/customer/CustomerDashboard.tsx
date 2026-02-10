@@ -110,6 +110,12 @@ export default function CustomerDashboard() {
             end_date: end.toISOString(),
             status: String(s?.status || 'active'),
             slot_id: s?.slotId ? String(s.slotId) : (s?.slot_id ? String(s.slot_id) : null),
+            service_slots: (s?.loginEmail || s?.loginPassword || s?.loginSlotName) ? {
+              email: s?.loginEmail ? String(s.loginEmail) : null,
+              password: s?.loginPassword ? String(s.loginPassword) : null,
+              slot_name: s?.loginSlotName ? String(s.loginSlotName) : null,
+              updated_at: s?.loginUpdatedAt ? String(s.loginUpdatedAt) : new Date().toISOString(),
+            } : null,
           } as Subscription;
         });
     } catch (e) {
@@ -182,7 +188,17 @@ export default function CustomerDashboard() {
         .eq('customer_id', customerId)
         .order('end_date', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching subscriptions (db):', error);
+        const localSubs = loadLocalSubscriptionsForCustomer(customerId);
+        if (localSubs.length > 0) {
+          setSubscriptions(localSubs);
+          return;
+        }
+        toast.error('حدث خطأ في تحميل الاشتراكات');
+        setSubscriptions([]);
+        return;
+      }
 
       const dbSubs = (data || []) as Subscription[];
       if (dbSubs.length > 0) {
@@ -197,10 +213,16 @@ export default function CustomerDashboard() {
       // Attach slot credentials for shared subscriptions.
       const slotIds = Array.from(new Set(localSubs.map((s) => s.slot_id).filter((v): v is string => typeof v === 'string' && v.length > 0)));
       if (slotIds.length > 0) {
-        const { data: slotsData } = await supabase
+        const { data: slotsData, error: slotsErr } = await supabase
           .from('service_slots')
           .select('id, email, password, slot_name, updated_at')
           .in('id', slotIds);
+
+        if (slotsErr) {
+          console.error('Error fetching service slots:', slotsErr);
+          setSubscriptions(localSubs);
+          return;
+        }
 
         const byId = new Map<string, any>((slotsData || []).map((x: any) => [String(x.id), x]));
         const withSlots = localSubs.map((s) => {
@@ -213,10 +235,14 @@ export default function CustomerDashboard() {
       }
     } catch (err) {
       console.error('Error fetching subscriptions:', err);
-      toast.error('حدث خطأ في تحميل الاشتراكات');
 
-      // Last-resort fallback to localStorage.
-      setSubscriptions(loadLocalSubscriptionsForCustomer(customerId));
+      const local = loadLocalSubscriptionsForCustomer(customerId);
+      if (local.length > 0) {
+        setSubscriptions(local);
+      } else {
+        toast.error('حدث خطأ في تحميل الاشتراكات');
+        setSubscriptions([]);
+      }
     } finally {
       setIsLoading(false);
     }
