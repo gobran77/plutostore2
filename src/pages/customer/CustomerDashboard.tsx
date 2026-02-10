@@ -854,11 +854,11 @@ export default function CustomerDashboard() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border py-2 px-4">
-        <div className="max-w-lg mx-auto flex justify-around">
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border py-2 px-3">
+        <div className="max-w-lg mx-auto flex flex-wrap justify-between gap-1">
           <button
             onClick={() => setActiveTab('home')}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex flex-1 min-w-[64px] flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
               activeTab === 'home' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
             }`}
           >
@@ -867,7 +867,7 @@ export default function CustomerDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('subscriptions')}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex flex-1 min-w-[64px] flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
               activeTab === 'subscriptions' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
             }`}
           >
@@ -876,7 +876,7 @@ export default function CustomerDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('credentials')}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex flex-1 min-w-[64px] flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
               activeTab === 'credentials' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
             }`}
           >
@@ -885,7 +885,7 @@ export default function CustomerDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('services')}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex flex-1 min-w-[64px] flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
               activeTab === 'services' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
             }`}
           >
@@ -894,7 +894,7 @@ export default function CustomerDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex flex-1 min-w-[64px] flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
               activeTab === 'tickets' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
             }`}
           >
