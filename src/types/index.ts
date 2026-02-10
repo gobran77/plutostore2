@@ -43,6 +43,8 @@ export interface SubscriptionPaymentMethod {
 
 export interface Subscription {
   id: string;
+  // Supabase row id for customer_subscriptions (if created/synced).
+  dbId?: string;
   customerId: string;
   customerName: string;
   customerCode?: string;

@@ -280,6 +280,11 @@ const Subscriptions = () => {
         return;
       }
 
+      newSubscription = {
+        ...newSubscription,
+        dbId: insertedSubscription?.id || undefined,
+      };
+
       // For shared subscriptions, fetch slot credentials once and store them locally for the customer portal.
       if (subscriptionData.subscriptionType === 'shared' && subscriptionData.slotId) {
         const { data: slotData, error: slotErr } = await supabase
@@ -362,16 +367,64 @@ const Subscriptions = () => {
 
   const handleDeleteSubscription = async () => {
     if (selectedSubscription) {
-      // Delete from Supabase first
+      // Delete from Supabase first (and any dependent rows).
       try {
-        const { error } = await supabase
-          .from('customer_subscriptions')
-          .delete()
-          .eq('customer_id', selectedSubscription.customerId)
-          .ilike('service_name', `%${selectedSubscription.services[0]?.serviceName || ''}%`);
+        const dbId = (selectedSubscription as any).dbId as string | undefined;
 
-        if (error) {
-          console.error('Error deleting from Supabase:', error);
+        if (dbId) {
+          // Remove renewal requests first to avoid FK issues.
+          await supabase.from('renewal_requests').delete().eq('subscription_id', dbId);
+
+          const { error } = await supabase
+            .from('customer_subscriptions')
+            .delete()
+            .eq('id', dbId);
+
+          if (error) {
+            console.error('Error deleting from Supabase:', error);
+          }
+
+          // Revert deferred balance deduction in customer_accounts.
+          if (selectedSubscription.paymentStatus === 'deferred') {
+            const { data: customerData, error: fetchError } = await supabase
+              .from('customer_accounts')
+              .select('balance, currency, balance_sar, balance_yer, balance_usd')
+              .eq('id', selectedSubscription.customerId)
+              .single();
+
+            if (!fetchError && customerData) {
+              const amount = selectedSubscription.totalPrice || 0;
+              const currency = selectedSubscription.currency || customerData.currency || 'SAR';
+
+              const next: any = {
+                balance: (customerData.balance || 0) + amount,
+              };
+
+              if (currency === 'SAR') next.balance_sar = (customerData.balance_sar || 0) + amount;
+              if (currency === 'YER') next.balance_yer = (customerData.balance_yer || 0) + amount;
+              if (currency === 'USD') next.balance_usd = (customerData.balance_usd || 0) + amount;
+
+              const { error: updateError } = await supabase
+                .from('customer_accounts')
+                .update(next)
+                .eq('id', selectedSubscription.customerId);
+
+              if (updateError) {
+                console.error('Error reverting customer balance:', updateError);
+              }
+            }
+          }
+        } else {
+          // Fallback (older subscriptions without dbId)
+          const { error } = await supabase
+            .from('customer_subscriptions')
+            .delete()
+            .eq('customer_id', selectedSubscription.customerId)
+            .ilike('service_name', `%${selectedSubscription.services[0]?.serviceName || ''}%`);
+
+          if (error) {
+            console.error('Error deleting from Supabase:', error);
+          }
         }
       } catch (err) {
         console.error('Error:', err);
