@@ -19,7 +19,6 @@ import {
   HeadphonesIcon,
   KeyRound
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { differenceInDays, format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -139,134 +138,26 @@ export default function CustomerDashboard() {
     }
 
     const customerData = JSON.parse(session) as CustomerSession;
-    setCustomer(customerData);
-    fetchSubscriptions(customerData.id);
-    fetchUpdatedBalance(customerData.id);
+    // Ensure balances object exists (older sessions won't have it).
+    const balances: CustomerBalances = customerData.balances || {
+      balance_sar: 0,
+      balance_yer: 0,
+      balance_usd: 0,
+    };
+    const normalized = { ...customerData, balances };
+    setCustomer(normalized);
+    fetchSubscriptions(normalized.id);
+    fetchUpdatedBalance(normalized.id);
   }, [navigate]);
 
-  const fetchUpdatedBalance = async (customerId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('customer_accounts')
-        .select('balance, currency, balance_sar, balance_yer, balance_usd')
-        .eq('id', customerId)
-        .single();
-
-      if (!error && data) {
-        const balances: CustomerBalances = {
-          balance_sar: data.balance_sar || 0,
-          balance_yer: data.balance_yer || 0,
-          balance_usd: data.balance_usd || 0,
-        };
-        
-        setCustomer(prev => prev ? { 
-          ...prev, 
-          balance: data.balance || 0, 
-          currency: data.currency || 'SAR',
-          balances 
-        } : null);
-        
-        // Update session
-        const session = localStorage.getItem('customer_session');
-        if (session) {
-          const parsed = JSON.parse(session);
-          parsed.balance = data.balance || 0;
-          parsed.currency = data.currency || 'SAR';
-          parsed.balances = balances;
-          localStorage.setItem('customer_session', JSON.stringify(parsed));
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching balance:', err);
-    }
+  const fetchUpdatedBalance = async (_customerId: string) => {
+    // Supabase removed: keep balances from local session only.
   };
 
   const fetchSubscriptions = async (customerId: string) => {
     try {
-      // Prefer edge function so customers can load their subscriptions even if RLS blocks direct table access.
-      const sessionRaw = localStorage.getItem('customer_session');
-      if (sessionRaw) {
-        try {
-          const sess = JSON.parse(sessionRaw) as any;
-          const activation_code = typeof sess?.activation_code === 'string' ? sess.activation_code : '';
-          const whatsapp_number = typeof sess?.whatsapp_number === 'string' ? sess.whatsapp_number : '';
-
-          if (activation_code && whatsapp_number) {
-            const { data: fnData, error: fnErr } = await supabase.functions.invoke('get-customer-subscriptions', {
-              body: { customer_id: customerId, whatsapp_number, activation_code },
-            });
-
-            if (!fnErr && fnData?.success && Array.isArray(fnData?.subscriptions)) {
-              setSubscriptions(fnData.subscriptions as Subscription[]);
-              return;
-            }
-          }
-        } catch {
-          // ignore session parse errors
-        }
-      }
-
-      const { data, error } = await supabase
-        .from('customer_subscriptions')
-        .select('*, service_slots(email, password, slot_name, updated_at)')
-        .eq('customer_id', customerId)
-        .order('end_date', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching subscriptions (db):', error);
-        const localSubs = loadLocalSubscriptionsForCustomer(customerId);
-        if (localSubs.length > 0) {
-          setSubscriptions(localSubs);
-          return;
-        }
-        toast.error('حدث خطأ في تحميل الاشتراكات');
-        setSubscriptions([]);
-        return;
-      }
-
-      const dbSubs = (data || []) as Subscription[];
-      if (dbSubs.length > 0) {
-        setSubscriptions(dbSubs);
-        return;
-      }
-
-      // Fallback for environments where customer_subscriptions has limited fields or is empty:
-      // use localStorage subscriptions created by the admin in this browser.
       const localSubs = loadLocalSubscriptionsForCustomer(customerId);
-
-      // Attach slot credentials for shared subscriptions.
-      const slotIds = Array.from(new Set(localSubs.map((s) => s.slot_id).filter((v): v is string => typeof v === 'string' && v.length > 0)));
-      if (slotIds.length > 0) {
-        const { data: slotsData, error: slotsErr } = await supabase
-          .from('service_slots')
-          .select('id, email, password, slot_name, updated_at')
-          .in('id', slotIds);
-
-        if (slotsErr) {
-          console.error('Error fetching service slots:', slotsErr);
-          setSubscriptions(localSubs);
-          return;
-        }
-
-        const byId = new Map<string, any>((slotsData || []).map((x: any) => [String(x.id), x]));
-        const withSlots = localSubs.map((s) => {
-          const slot = s.slot_id ? byId.get(String(s.slot_id)) : null;
-          return slot ? { ...s, service_slots: slot } : s;
-        });
-        setSubscriptions(withSlots);
-      } else {
-        setSubscriptions(localSubs);
-      }
-    } catch (err) {
-      console.error('Error fetching subscriptions:', err);
-
-      const local = loadLocalSubscriptionsForCustomer(customerId);
-      if (local.length > 0) {
-        setSubscriptions(local);
-      } else {
-        toast.error('حدث خطأ في تحميل الاشتراكات');
-        setSubscriptions([]);
-      }
+      setSubscriptions(localSubs);
     } finally {
       setIsLoading(false);
     }
@@ -280,55 +171,17 @@ export default function CustomerDashboard() {
     );
   }, [subscriptions]);
 
-  // Listen for credential changes on assigned slots and notify the customer.
+  // Supabase removed: no realtime. Keep a simple in-browser sync via storage events.
   useEffect(() => {
     if (!customer?.id) return;
 
-    const channel = supabase
-      .channel(`customer-slot-updates-${customer.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'service_slots',
-        },
-        (payload: any) => {
-          const updatedId = payload?.new?.id as string | undefined;
-          if (!updatedId || !slotIdsRef.current.has(updatedId)) return;
-
-          setCredentialsUpdated(true);
-          toast.error('تم تحديث بيانات الدخول. يرجى تسجيل الدخول من جديد والتواصل مع الادمن لطلب كود التحقق.');
-
-          // Update UI immediately even if fetching subscriptions is blocked (RLS/network).
-          const nextEmail = payload?.new?.email ?? null;
-          const nextPassword = payload?.new?.password ?? null;
-          const nextSlotName = payload?.new?.slot_name ?? null;
-          const nextUpdatedAt = payload?.new?.updated_at ?? new Date().toISOString();
-
-          setSubscriptions((prev) =>
-            prev.map((s) =>
-              s.slot_id === updatedId
-                ? {
-                    ...s,
-                    service_slots: {
-                      email: nextEmail,
-                      password: nextPassword,
-                      slot_name: nextSlotName,
-                      updated_at: nextUpdatedAt,
-                    },
-                  }
-                : s
-            )
-          );
-          fetchSubscriptions(customer.id);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== SUBSCRIPTIONS_STORAGE_KEY) return;
+      fetchSubscriptions(customer.id);
     };
+
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [customer?.id]);
 
   const handleLogout = () => {

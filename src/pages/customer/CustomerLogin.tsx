@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Zap, Phone, Lock, Eye, EyeOff, KeyRound, ArrowRight, Tag } from 'lucide-react';
 import { ServicesPricingModal } from '@/components/customer/ServicesPricingModal';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface PendingCustomer {
@@ -17,6 +16,35 @@ interface PendingCustomer {
   currency: string;
   activation_code: string;
 }
+
+const CUSTOMER_ACCOUNTS_KEY = 'app_customer_accounts';
+
+type LocalCustomerAccount = {
+  id: string;
+  name: string;
+  whatsapp_number: string;
+  password_hash: string;
+  activation_code: string;
+  is_activated: boolean;
+  is_admin?: boolean;
+  account_type?: string;
+  balance?: number;
+  currency?: string;
+  balance_sar?: number;
+  balance_yer?: number;
+  balance_usd?: number;
+};
+
+const loadAccounts = (): LocalCustomerAccount[] => {
+  try {
+    const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
 
 export default function CustomerLogin() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
@@ -40,14 +68,11 @@ export default function CustomerLogin() {
     setIsLoading(true);
 
     try {
-      // Find customer by WhatsApp number
-      const { data: customer, error } = await supabase
-        .from('customer_accounts')
-        .select('*')
-        .eq('whatsapp_number', whatsappNumber.trim())
-        .single();
+      const customer = loadAccounts().find(
+        (a) => String(a.whatsapp_number || '').trim() === whatsappNumber.trim()
+      );
 
-      if (error || !customer) {
+      if (!customer) {
         toast.error('رقم الواتساب غير مسجل');
         setIsLoading(false);
         return;
@@ -75,44 +100,17 @@ export default function CustomerLogin() {
       } else {
         // Generate new activation code for each login
         const newActivationCode = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        // Update activation code in database
-        await supabase
-          .from('customer_accounts')
-          .update({ activation_code: newActivationCode })
-          .eq('id', customer.id);
 
-        // Send activation code via WhatsApp
-        const whatsappMessage = [
-          `🔐 *كود التفعيل الخاص بك*`,
-          ``,
-          `مرحباً ${customer.name}،`,
-          ``,
-          `كود التفعيل: *${newActivationCode}*`,
-          ``,
-          `📱 *كيفية الاستخدام:*`,
-          `1️⃣ أدخل الكود في خانة "كود التفعيل"`,
-          `2️⃣ اضغط على زر "تفعيل الحساب"`,
-          `3️⃣ سيتم تحويلك للوحة التحكم`,
-          ``,
-          `⚠️ هذا الكود صالح لمرة واحدة فقط`,
-          ``,
-          `بلوتو ستور AI 🚀`,
-        ].join('\n');
-
-        try {
-          await supabase.functions.invoke('send-whatsapp', {
-            body: {
-              to: customer.whatsapp_number,
-              message: whatsappMessage,
-              customerName: customer.name,
-            },
-          });
-          toast.success('تم إرسال كود التفعيل إلى واتساب');
-        } catch (err) {
-          console.error('Error sending activation code:', err);
-          toast.info('أدخل كود التفعيل للمتابعة');
+        // Update activation code locally
+        const accounts = loadAccounts();
+        const idx = accounts.findIndex((a) => a.id === customer.id);
+        if (idx !== -1) {
+          accounts[idx] = { ...accounts[idx], activation_code: newActivationCode };
+          localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
         }
+
+        // Supabase removed: no WhatsApp sending from backend.
+        toast.info('تم إنشاء كود تفعيل. أدخله للمتابعة');
 
         // All customers must enter activation code every time
         setPendingCustomer({
@@ -157,24 +155,26 @@ export default function CustomerLogin() {
         return;
       }
 
-      // Mark account as activated if not already
-      await supabase
-        .from('customer_accounts')
-        .update({ is_activated: true })
-        .eq('id', pendingCustomer.id);
+      // Mark account as activated locally
+      const accounts = loadAccounts();
+      const idx = accounts.findIndex((a) => a.id === pendingCustomer.id);
+      if (idx !== -1) {
+        accounts[idx] = { ...accounts[idx], is_activated: true };
+        localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
+      }
 
-        // Store customer session and navigate
-        localStorage.setItem('customer_session', JSON.stringify({
-          id: pendingCustomer.id,
-          name: pendingCustomer.name,
-          whatsapp_number: pendingCustomer.whatsapp_number,
-          balance: pendingCustomer.balance,
-          currency: pendingCustomer.currency,
-          activation_code: pendingCustomer.activation_code,
-        }));
-        
-        toast.success(`مرحباً ${pendingCustomer.name}!`);
-        navigate('/customer/dashboard');
+      // Store customer session and navigate
+      localStorage.setItem('customer_session', JSON.stringify({
+        id: pendingCustomer.id,
+        name: pendingCustomer.name,
+        whatsapp_number: pendingCustomer.whatsapp_number,
+        balance: pendingCustomer.balance,
+        currency: pendingCustomer.currency,
+        activation_code: pendingCustomer.activation_code,
+      }));
+      
+      toast.success(`مرحباً ${pendingCustomer.name}!`);
+      navigate('/customer/dashboard');
     } catch (err) {
       console.error('Activation error:', err);
       toast.error('حدث خطأ أثناء تسجيل الدخول');
