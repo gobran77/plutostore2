@@ -9,7 +9,7 @@ import { AddDBServiceModal } from '@/components/services/AddDBServiceModal';
 import { EditDBServiceModal } from '@/components/services/EditDBServiceModal';
 import { AddUserToServiceModal } from '@/components/services/AddUserToServiceModal';
 import { AddDynamicServiceModal } from '@/components/services/dynamic';
-import { Plus, Edit, Trash2, Eye, Package, Users, User, Mail, X, ChevronRight, ArrowRight, Zap, Settings2, ToggleLeft, ToggleRight, Database } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Package, Users, User, Mail, X, ChevronRight, ArrowRight, Zap, Settings2, ToggleLeft, ToggleRight, Database, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Customer } from '@/types';
 import { Service, ServiceAccount, ServiceEmail, ServiceUser, ServiceType } from '@/types/services';
@@ -58,6 +58,7 @@ const Services = () => {
   const [isAddDynamicServiceModalOpen, setIsAddDynamicServiceModalOpen] = useState(false);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isAddEmailModalOpen, setIsAddEmailModalOpen] = useState(false);
+  const [isEditEmailModalOpen, setIsEditEmailModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
@@ -70,6 +71,7 @@ const Services = () => {
   // Form states
   const [accountForm, setAccountForm] = useState<{ type: ServiceType; subscriberEmail: string }>({ type: 'shared', subscriberEmail: '' });
   const [emailForm, setEmailForm] = useState({ email: '', password: '' });
+  const [editEmailForm, setEditEmailForm] = useState({ email: '', password: '' });
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -295,6 +297,175 @@ const Services = () => {
     setEmailForm({ email: '', password: '' });
     setIsAddEmailModalOpen(false);
     toast.success('تمت إضافة الإيميل بنجاح');
+  };
+
+  const syncSharedEmailCredentialsToSupabase = async (params: {
+    serviceName: string;
+    oldEmail: string;
+    newEmail: string;
+    newPassword: string;
+  }) => {
+    const { serviceName, oldEmail, newEmail, newPassword } = params;
+    try {
+      // 1) Ensure service exists (by name)
+      const { data: existingSvc, error: svcErr } = await supabase
+        .from('services')
+        .select('id')
+        .eq('name', serviceName)
+        .maybeSingle();
+
+      if (svcErr) throw svcErr;
+
+      let serviceId = existingSvc?.id as string | undefined;
+      if (!serviceId) {
+        const { data: inserted, error: insErr } = await supabase
+          .from('services')
+          .insert({
+            name: serviceName,
+            description: null,
+            default_type: 'shared',
+            is_active: true,
+            pricing: [],
+          })
+          .select('id')
+          .single();
+
+        if (insErr) throw insErr;
+        serviceId = inserted.id;
+      }
+
+      // 2) Ensure shared account exists
+      const { data: accounts, error: accErr } = await supabase
+        .from('service_accounts')
+        .select('id')
+        .eq('service_id', serviceId)
+        .eq('account_type', 'shared');
+
+      if (accErr) throw accErr;
+
+      let accountId = accounts?.[0]?.id as string | undefined;
+      if (!accountId) {
+        const { data: insertedAcc, error: insAccErr } = await supabase
+          .from('service_accounts')
+          .insert({
+            service_id: serviceId,
+            account_type: 'shared',
+            name: 'shared',
+          })
+          .select('id')
+          .single();
+
+        if (insAccErr) throw insAccErr;
+        accountId = insertedAcc.id;
+      }
+
+      // 3) Update the matching slot (prefer old email; fallback to new email)
+      const { data: existingSlot, error: slotErr } = await supabase
+        .from('service_slots')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('email', oldEmail)
+        .maybeSingle();
+
+      if (slotErr) throw slotErr;
+
+      const doUpdate = async (slotId: string) => {
+        const { error: updErr } = await supabase
+          .from('service_slots')
+          .update({
+            email: newEmail,
+            password: newPassword || null,
+          })
+          .eq('id', slotId);
+
+        if (updErr) throw updErr;
+      };
+
+      if (existingSlot?.id) {
+        await doUpdate(existingSlot.id);
+        return;
+      }
+
+      const { data: existingSlot2, error: slotErr2 } = await supabase
+        .from('service_slots')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('email', newEmail)
+        .maybeSingle();
+
+      if (slotErr2) throw slotErr2;
+
+      if (existingSlot2?.id) {
+        await doUpdate(existingSlot2.id);
+        return;
+      }
+
+      // If not found, insert a new one.
+      const { error: insSlotErr } = await supabase.from('service_slots').insert({
+        account_id: accountId,
+        email: newEmail,
+        password: newPassword || null,
+        slot_name: null,
+        is_available: true,
+      });
+
+      if (insSlotErr) throw insSlotErr;
+    } catch (err) {
+      console.error('Error syncing shared email credentials to Supabase:', err);
+      toast.error('تم تحديث البيانات محلياً لكن فشل تحديثها في قاعدة البيانات');
+    }
+  };
+
+  const handleUpdateEmailCredentials = async () => {
+    if (!selectedService || !selectedAccount || !selectedEmail) return;
+    if (!editEmailForm.email.trim()) {
+      toast.error('يرجى إدخال الإيميل');
+      return;
+    }
+
+    const oldEmail = selectedEmail.email;
+    const updated: ServiceEmail = {
+      ...selectedEmail,
+      email: editEmailForm.email.trim(),
+      password: editEmailForm.password,
+    };
+
+    const updatedServices = services.map((s) => {
+      if (s.id !== selectedService.id) return s;
+      return {
+        ...s,
+        accounts: s.accounts.map((a) => {
+          if (a.id !== selectedAccount.id) return a;
+          return {
+            ...a,
+            sharedEmails: a.sharedEmails.map((e) => (e.id === selectedEmail.id ? updated : e)),
+          };
+        }),
+      };
+    });
+
+    setServices(updatedServices);
+    const updatedService = updatedServices.find((s) => s.id === selectedService.id);
+    if (updatedService) {
+      setSelectedService(updatedService);
+      const updatedAccount = updatedService.accounts.find((a) => a.id === selectedAccount.id);
+      if (updatedAccount) {
+        setSelectedAccount(updatedAccount);
+        const updatedEmail = updatedAccount.sharedEmails.find((e) => e.id === selectedEmail.id);
+        if (updatedEmail) setSelectedEmail(updatedEmail);
+      }
+    }
+
+    setIsEditEmailModalOpen(false);
+    toast.success('تم تحديث بيانات الدخول');
+
+    // Push update to Supabase so customers see it instantly (realtime service_slots update).
+    await syncSharedEmailCredentialsToSupabase({
+      serviceName: selectedService.name,
+      oldEmail,
+      newEmail: updated.email,
+      newPassword: updated.password,
+    });
   };
 
   // User CRUD
@@ -812,6 +983,15 @@ const Services = () => {
               },
             },
             {
+              label: 'تحديث الإيميل والباسورد',
+              icon: KeyRound,
+              onClick: () => {
+                setSelectedEmail(email);
+                setEditEmailForm({ email: email.email, password: email.password || '' });
+                setIsEditEmailModalOpen(true);
+              },
+            },
+            {
               label: 'حذف',
               icon: Trash2,
               onClick: () => {
@@ -1242,6 +1422,63 @@ const Services = () => {
               <div className="flex items-center gap-3 pt-4">
                 <button onClick={handleAddEmail} className="btn-primary flex-1">إضافة الإيميل</button>
                 <button onClick={() => setIsAddEmailModalOpen(false)} className="btn-secondary">إلغاء</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Email Credentials Modal */}
+      {isEditEmailModalOpen && selectedEmail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-foreground/50 backdrop-blur-sm"
+            onClick={() => {
+              setIsEditEmailModalOpen(false);
+            }}
+          />
+          <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in border border-border">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-xl font-bold text-foreground">تحديث بيانات الدخول</h2>
+              <button
+                onClick={() => setIsEditEmailModalOpen(false)}
+                className="p-2 rounded-lg hover:bg-muted transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  الإيميل <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={editEmailForm.email}
+                  onChange={(e) => setEditEmailForm({ ...editEmailForm, email: e.target.value })}
+                  placeholder="user@example.com"
+                  className="input-field"
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">كلمة المرور</label>
+                <input
+                  type="text"
+                  value={editEmailForm.password}
+                  onChange={(e) => setEditEmailForm({ ...editEmailForm, password: e.target.value })}
+                  placeholder="كلمة المرور للحساب"
+                  className="input-field"
+                  dir="ltr"
+                />
+              </div>
+              <div className="flex items-center gap-3 pt-4">
+                <button onClick={handleUpdateEmailCredentials} className="btn-primary flex-1">
+                  حفظ
+                </button>
+                <button onClick={() => setIsEditEmailModalOpen(false)} className="btn-secondary">
+                  إلغاء
+                </button>
               </div>
             </div>
           </div>

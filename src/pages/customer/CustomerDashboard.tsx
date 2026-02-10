@@ -275,6 +275,28 @@ export default function CustomerDashboard() {
 
           setCredentialsUpdated(true);
           toast.error('تم تحديث بيانات الدخول. يرجى تسجيل الدخول من جديد والتواصل مع الادمن لطلب كود التحقق.');
+
+          // Update UI immediately even if fetching subscriptions is blocked (RLS/network).
+          const nextEmail = payload?.new?.email ?? null;
+          const nextPassword = payload?.new?.password ?? null;
+          const nextSlotName = payload?.new?.slot_name ?? null;
+          const nextUpdatedAt = payload?.new?.updated_at ?? new Date().toISOString();
+
+          setSubscriptions((prev) =>
+            prev.map((s) =>
+              s.slot_id === updatedId
+                ? {
+                    ...s,
+                    service_slots: {
+                      email: nextEmail,
+                      password: nextPassword,
+                      slot_name: nextSlotName,
+                      updated_at: nextUpdatedAt,
+                    },
+                  }
+                : s
+            )
+          );
           fetchSubscriptions(customer.id);
         }
       )
