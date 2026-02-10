@@ -16,7 +16,8 @@ import {
   RefreshCw,
   MessageCircle,
   Package,
-  HeadphonesIcon
+  HeadphonesIcon,
+  KeyRound
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -67,7 +68,7 @@ export default function CustomerDashboard() {
   const [customer, setCustomer] = useState<CustomerSession | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'home' | 'subscriptions' | 'services' | 'tickets'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'subscriptions' | 'credentials' | 'services' | 'tickets'>('home');
   const [isAdmin, setIsAdmin] = useState(false);
   const [credentialsUpdated, setCredentialsUpdated] = useState(false);
   const slotIdsRef = useRef<Set<string>>(new Set());
@@ -475,7 +476,7 @@ export default function CustomerDashboard() {
               customer.balances?.balance_usd < 0) && (
               <div className="mt-3 p-2 bg-destructive/20 rounded-lg flex items-center gap-2 text-sm">
                 <AlertTriangle className="w-4 h-4" />
-                <span>لديك مبالغ مستحقة في بعض العملات</span>
+                <span>يوجد عليكم مبالغ مستحقة في بعض العملات</span>
               </div>
             )}
           </div>
@@ -709,21 +710,21 @@ export default function CustomerDashboard() {
                       {/* Login details (shared slots) */}
                       {sub.service_slots?.email && (
                         <div className="pt-3 border-t border-border space-y-2">
-                          <p className="text-sm font-semibold">Login details</p>
+                          <p className="text-sm font-semibold">بيانات الدخول</p>
                           <div className="grid grid-cols-1 gap-2 text-sm">
                             <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Email</span>
+                              <span className="text-muted-foreground">الإيميل</span>
                               <span className="font-mono" dir="ltr">{sub.service_slots.email}</span>
                             </div>
                             {sub.service_slots.password && (
                               <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Password</span>
+                                <span className="text-muted-foreground">كلمة المرور</span>
                                 <span className="font-mono" dir="ltr">{sub.service_slots.password}</span>
                               </div>
                             )}
                             {sub.service_slots.slot_name && (
                               <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Slot</span>
+                                <span className="text-muted-foreground">السلوت</span>
                                 <span className="font-medium">{sub.service_slots.slot_name}</span>
                               </div>
                             )}
@@ -747,6 +748,61 @@ export default function CustomerDashboard() {
         {activeTab === 'tickets' && (
           <CustomerTickets customerId={customer.id} />
         )}
+
+        {/* Credentials Section */}
+        {activeTab === 'credentials' && (
+          <Card className="border-0 shadow-md">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-primary" />
+                بياناتي
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {subscriptions.filter((s) => s.service_slots?.email || s.service_slots?.password).length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  لا توجد بيانات دخول حالياً
+                </p>
+              ) : (
+                subscriptions
+                  .filter((s) => s.service_slots?.email || s.service_slots?.password)
+                  .map((sub) => (
+                    <div key={sub.id} className="border rounded-xl p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold">{sub.service_name}</h3>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(sub.end_date), 'dd MMM yyyy', { locale: ar })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 text-sm">
+                        {sub.service_slots?.email && (
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">الإيميل</span>
+                            <span className="font-mono" dir="ltr">{sub.service_slots.email}</span>
+                          </div>
+                        )}
+                        {sub.service_slots?.password && (
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">كلمة المرور</span>
+                            <span className="font-mono" dir="ltr">{sub.service_slots.password}</span>
+                          </div>
+                        )}
+                        {sub.service_slots?.slot_name && (
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">السلوت</span>
+                            <span className="font-medium">{sub.service_slots.slot_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </CardContent>
+          </Card>
+        )}
       </main>
 
       {/* Bottom Navigation */}
@@ -769,6 +825,15 @@ export default function CustomerDashboard() {
           >
             <CreditCard className="w-5 h-5" />
             <span className="text-xs">اشتراكاتي</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('credentials')}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              activeTab === 'credentials' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
+            }`}
+          >
+            <KeyRound className="w-5 h-5" />
+            <span className="text-xs">بياناتي</span>
           </button>
           <button
             onClick={() => setActiveTab('services')}
