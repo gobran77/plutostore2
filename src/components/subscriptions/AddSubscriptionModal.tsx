@@ -113,7 +113,6 @@ export const AddSubscriptionModal = ({
     deferredDays: 2,
     paymentNotes: '',
     subscriptionType: 'private',
-    accountType: '',
   });
 
   // Shared subscription state
@@ -144,7 +143,6 @@ export const AddSubscriptionModal = ({
         deferredDays: 2,
         paymentNotes: '',
         subscriptionType: 'private',
-        accountType: '',
       });
       setSubscriptionServices([{ id: '1', serviceName: '', price: 0, cost: 0 }]);
       setSelectedSharedServiceId('');
@@ -390,7 +388,6 @@ export const AddSubscriptionModal = ({
       } : undefined,
       // Shared subscription data
       subscriptionType: formData.subscriptionType as 'private' | 'shared',
-      accountType: formData.accountType || undefined,
       slotId: selectedSlotId || undefined,
     });
     
@@ -515,7 +512,7 @@ export const AddSubscriptionModal = ({
           </div>
 
           {/* Subscription Type */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 نوع الاشتراك
@@ -523,7 +520,7 @@ export const AddSubscriptionModal = ({
               <select
                 value={formData.subscriptionType}
                 onChange={(e) => {
-                  setFormData({ ...formData, subscriptionType: e.target.value, accountType: e.target.value === 'private' ? '' : formData.accountType });
+                  setFormData({ ...formData, subscriptionType: e.target.value });
                   if (e.target.value === 'private') {
                     setSelectedSharedServiceId('');
                     setSelectedSlotId('');
@@ -537,24 +534,6 @@ export const AddSubscriptionModal = ({
               </select>
             </div>
             
-            {/* Account Type - Only show for shared subscriptions */}
-            {formData.subscriptionType === 'shared' && (
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  نوع الحساب
-                </label>
-                <select
-                  value={formData.accountType}
-                  onChange={(e) => setFormData({ ...formData, accountType: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="">اختر نوع الحساب</option>
-                  {accountTypes.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
 
           {/* Shared Service Selection */}
