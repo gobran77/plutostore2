@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+// Supabase removed: localStorage-backed tickets/messages.
 
 export interface TicketMessage {
   id: string;
@@ -31,52 +32,69 @@ export interface SupportTicket {
   last_message?: TicketMessage;
 }
 
+const TICKETS_KEY = 'app_support_tickets';
+const MESSAGES_KEY = 'app_ticket_messages';
+const CUSTOMERS_KEY = 'app_customer_accounts';
+
+type LocalCustomerAccount = {
+  id: string;
+  name: string;
+  whatsapp_number: string;
+};
+
+const loadJsonArray = (key: string): any[] => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveJsonArray = (key: string, value: any[]) => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+const generateTicketNumber = () => {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `TKT-${timestamp}-${random}`;
+};
+
 export function useSupportTickets(customerId?: string) {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openCount, setOpenCount] = useState(0);
 
-  const generateTicketNumber = () => {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `TKT-${timestamp}-${random}`;
-  };
-
   const fetchTickets = useCallback(async () => {
-    try {
-      let query = supabase
-        .from('support_tickets')
-        .select(`
-          *,
-          customer:customer_accounts(name, whatsapp_number)
-        `)
-        .order('updated_at', { ascending: false });
+    const allTickets = loadJsonArray(TICKETS_KEY) as SupportTicket[];
+    const allMessages = loadJsonArray(MESSAGES_KEY) as TicketMessage[];
+    const customers = loadJsonArray(CUSTOMERS_KEY) as LocalCustomerAccount[];
 
-      if (customerId) {
-        query = query.eq('customer_id', customerId);
-      }
+    const filtered = (customerId
+      ? allTickets.filter((t) => t.customer_id === customerId)
+      : allTickets
+    )
+      .map((t) => {
+        const msgs = allMessages
+          .filter((m) => m.ticket_id === t.id)
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        const last = msgs.length > 0 ? msgs[msgs.length - 1] : undefined;
+        const cust = customers.find((c) => c.id === t.customer_id);
+        return {
+          ...t,
+          customer: cust ? { name: cust.name, whatsapp_number: cust.whatsapp_number } : undefined,
+          messages: msgs,
+          last_message: last,
+        } as SupportTicket;
+      })
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const parsedTickets = (data || []).map((t: any) => ({
-        ...t,
-        customer: t.customer ? {
-          name: t.customer.name,
-          whatsapp_number: t.customer.whatsapp_number,
-        } : undefined,
-      }));
-
-      setTickets(parsedTickets);
-      setOpenCount(parsedTickets.filter((t: SupportTicket) => 
-        t.status === 'open' || t.status === 'in_progress'
-      ).length);
-    } catch (err) {
-      console.error('Error fetching tickets:', err);
-    } finally {
-      setIsLoading(false);
-    }
+    setTickets(filtered);
+    setOpenCount(filtered.filter((t) => t.status === 'open' || t.status === 'in_progress').length);
+    setIsLoading(false);
   }, [customerId]);
 
   const createTicket = async (subject: string, initialMessage?: string) => {
@@ -85,107 +103,77 @@ export function useSupportTickets(customerId?: string) {
       return null;
     }
 
-    try {
-      const ticketNumber = generateTicketNumber();
-      
-      const { data: ticket, error: ticketError } = await supabase
-        .from('support_tickets')
-        .insert([{
-          ticket_number: ticketNumber,
-          customer_id: customerId,
-          subject,
-        }])
-        .select()
-        .single();
+    const now = new Date().toISOString();
+    const ticket: SupportTicket = {
+      id: `tkt_${Date.now()}`,
+      ticket_number: generateTicketNumber(),
+      customer_id: customerId,
+      subject,
+      status: 'open',
+      priority: 'normal',
+      created_at: now,
+      updated_at: now,
+    };
 
-      if (ticketError) throw ticketError;
+    const tickets = loadJsonArray(TICKETS_KEY) as SupportTicket[];
+    tickets.unshift(ticket);
+    saveJsonArray(TICKETS_KEY, tickets);
 
-      // Add initial message if provided
-      if (initialMessage && ticket) {
-        await supabase
-          .from('ticket_messages')
-          .insert([{
-            ticket_id: ticket.id,
-            sender_type: 'customer',
-            sender_id: customerId,
-            message_type: 'text',
-            content: initialMessage,
-          }]);
-      }
-
-      toast.success('تم إنشاء التذكرة بنجاح');
-      fetchTickets();
-      return ticket;
-    } catch (err) {
-      console.error('Error creating ticket:', err);
-      toast.error('حدث خطأ أثناء إنشاء التذكرة');
-      return null;
+    if (initialMessage && initialMessage.trim().length > 0) {
+      const msg: TicketMessage = {
+        id: `msg_${Date.now()}`,
+        ticket_id: ticket.id,
+        sender_type: 'customer',
+        sender_id: customerId,
+        message_type: 'text',
+        content: initialMessage.trim(),
+        file_url: null,
+        file_name: null,
+        created_at: now,
+      };
+      const messages = loadJsonArray(MESSAGES_KEY) as TicketMessage[];
+      messages.push(msg);
+      saveJsonArray(MESSAGES_KEY, messages);
     }
+
+    toast.success('تم إنشاء التذكرة بنجاح');
+    await fetchTickets();
+    return ticket;
   };
 
   const updateTicketStatus = async (ticketId: string, status: SupportTicket['status']) => {
-    try {
-      const { error } = await supabase
-        .from('support_tickets')
-        .update({ status })
-        .eq('id', ticketId);
-
-      if (error) throw error;
-
-      toast.success('تم تحديث حالة التذكرة');
-      fetchTickets();
-      return true;
-    } catch (err) {
-      console.error('Error updating ticket:', err);
-      toast.error('حدث خطأ أثناء تحديث التذكرة');
-      return false;
-    }
+    const tickets = loadJsonArray(TICKETS_KEY) as SupportTicket[];
+    const idx = tickets.findIndex((t) => t.id === ticketId);
+    if (idx === -1) return false;
+    tickets[idx] = { ...tickets[idx], status, updated_at: new Date().toISOString() };
+    saveJsonArray(TICKETS_KEY, tickets);
+    toast.success('تم تحديث حالة التذكرة');
+    await fetchTickets();
+    return true;
   };
 
   const deleteTicket = async (ticketId: string) => {
-    try {
-      const { error } = await supabase
-        .from('support_tickets')
-        .delete()
-        .eq('id', ticketId);
-
-      if (error) throw error;
-
-      toast.success('تم حذف التذكرة');
-      fetchTickets();
-      return true;
-    } catch (err) {
-      console.error('Error deleting ticket:', err);
-      toast.error('حدث خطأ أثناء حذف التذكرة');
-      return false;
-    }
+    const tickets = (loadJsonArray(TICKETS_KEY) as SupportTicket[]).filter((t) => t.id !== ticketId);
+    saveJsonArray(TICKETS_KEY, tickets);
+    const messages = (loadJsonArray(MESSAGES_KEY) as TicketMessage[]).filter((m) => m.ticket_id !== ticketId);
+    saveJsonArray(MESSAGES_KEY, messages);
+    toast.success('تم حذف التذكرة');
+    await fetchTickets();
+    return true;
   };
 
-  // Initial fetch
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
 
-  // Subscribe to realtime updates
   useEffect(() => {
-    const channel = supabase
-      .channel('tickets_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'support_tickets',
-        },
-        () => {
-          fetchTickets();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === TICKETS_KEY || e.key === MESSAGES_KEY || e.key === CUSTOMERS_KEY) {
+        fetchTickets();
+      }
     };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [fetchTickets]);
 
   return {
@@ -209,131 +197,70 @@ export function useTicketMessages(ticketId: string | null) {
       setIsLoading(false);
       return;
     }
-
-    try {
-      const { data, error } = await supabase
-        .from('ticket_messages')
-        .select('*')
-        .eq('ticket_id', ticketId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const typedMessages: TicketMessage[] = (data || []).map((m: any) => ({
-        ...m,
-        sender_type: m.sender_type as 'customer' | 'admin',
-        message_type: m.message_type as 'text' | 'image' | 'file' | 'voice',
-      }));
-      setMessages(typedMessages);
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-    } finally {
-      setIsLoading(false);
-    }
+    const all = loadJsonArray(MESSAGES_KEY) as TicketMessage[];
+    const msgs = all
+      .filter((m) => m.ticket_id === ticketId)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    setMessages(msgs);
+    setIsLoading(false);
   }, [ticketId]);
 
-  const sendMessage = async (
-    senderId: string,
-    senderType: 'customer' | 'admin',
-    content: string,
-    messageType: 'text' | 'image' | 'file' | 'voice' = 'text',
-    fileUrl?: string,
-    fileName?: string
-  ) => {
+  const sendMessage = async (params: {
+    senderType: 'customer' | 'admin';
+    senderId: string;
+    messageType: TicketMessage['message_type'];
+    content?: string;
+    fileUrl?: string;
+    fileName?: string;
+  }) => {
     if (!ticketId) return false;
 
-    try {
-      const { error } = await supabase
-        .from('ticket_messages')
-        .insert([{
-          ticket_id: ticketId,
-          sender_type: senderType,
-          sender_id: senderId,
-          message_type: messageType,
-          content: messageType === 'text' ? content : null,
-          file_url: fileUrl || null,
-          file_name: fileName || null,
-        }]);
+    const now = new Date().toISOString();
+    const msg: TicketMessage = {
+      id: `msg_${Date.now()}`,
+      ticket_id: ticketId,
+      sender_type: params.senderType,
+      sender_id: params.senderId,
+      message_type: params.messageType,
+      content: params.content ? String(params.content) : null,
+      file_url: params.fileUrl ? String(params.fileUrl) : null,
+      file_name: params.fileName ? String(params.fileName) : null,
+      created_at: now,
+    };
 
-      if (error) throw error;
+    const all = loadJsonArray(MESSAGES_KEY) as TicketMessage[];
+    all.push(msg);
+    saveJsonArray(MESSAGES_KEY, all);
 
-      // Update ticket updated_at
-      await supabase
-        .from('support_tickets')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', ticketId);
-
-      fetchMessages();
-      return true;
-    } catch (err) {
-      console.error('Error sending message:', err);
-      toast.error('حدث خطأ أثناء إرسال الرسالة');
-      return false;
+    // bump ticket updated_at
+    const tickets = loadJsonArray(TICKETS_KEY) as SupportTicket[];
+    const idx = tickets.findIndex((t) => t.id === ticketId);
+    if (idx !== -1) {
+      tickets[idx] = { ...tickets[idx], updated_at: now };
+      saveJsonArray(TICKETS_KEY, tickets);
     }
+
+    await fetchMessages();
+    return true;
   };
 
-  const uploadFile = async (file: File): Promise<{ url: string; name: string } | null> => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `tickets/${ticketId}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('ticket-attachments')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('ticket-attachments')
-        .getPublicUrl(filePath);
-
-      return {
-        url: urlData.publicUrl,
-        name: file.name,
-      };
-    } catch (err) {
-      console.error('Error uploading file:', err);
-      toast.error('حدث خطأ أثناء رفع الملف');
-      return null;
-    }
+  const uploadFile = async () => {
+    toast.error('رفع الملفات غير متاح بدون Supabase');
+    return null;
   };
 
-  // Initial fetch
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Subscribe to realtime updates
   useEffect(() => {
-    if (!ticketId) return;
-
-    const channel = supabase
-      .channel(`messages_${ticketId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'ticket_messages',
-          filter: `ticket_id=eq.${ticketId}`,
-        },
-        () => {
-          fetchMessages();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === MESSAGES_KEY || e.key === TICKETS_KEY) fetchMessages();
     };
-  }, [ticketId, fetchMessages]);
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [fetchMessages]);
 
-  return {
-    messages,
-    isLoading,
-    sendMessage,
-    uploadFile,
-    refetch: fetchMessages,
-  };
+  return { messages, isLoading, sendMessage, uploadFile, refetch: fetchMessages };
 }
+

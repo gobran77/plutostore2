@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ServiceRequestStatus } from '@/types/serviceRequests';
+
+// Supabase removed: localStorage-backed service requests.
 
 export interface ServiceRequest {
   id: string;
@@ -27,7 +28,35 @@ export interface ServiceRequest {
   };
 }
 
-const getBalanceColumn = (currency: string): string => {
+const REQUESTS_KEY = 'app_service_requests';
+const ACCOUNTS_KEY = 'app_customer_accounts';
+
+type LocalCustomerAccount = {
+  id: string;
+  name: string;
+  whatsapp_number: string;
+  balance?: number;
+  balance_sar?: number;
+  balance_yer?: number;
+  balance_usd?: number;
+};
+
+const loadArray = <T,>(key: string): T[] => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveArray = (key: string, value: any[]) => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+const getBalanceColumn = (currency: string): keyof LocalCustomerAccount => {
   switch (currency) {
     case 'SAR': return 'balance_sar';
     case 'YER': return 'balance_yer';
@@ -36,48 +65,58 @@ const getBalanceColumn = (currency: string): string => {
   }
 };
 
+const adjustBalance = (customerId: string, currency: string, delta: number) => {
+  const col = getBalanceColumn(currency);
+  const accounts = loadArray<LocalCustomerAccount>(ACCOUNTS_KEY);
+  const idx = accounts.findIndex((a) => a.id === customerId);
+  if (idx === -1) return;
+  const cur = Number((accounts[idx] as any)[col] || 0);
+  (accounts[idx] as any)[col] = cur + delta;
+  saveArray(ACCOUNTS_KEY, accounts as any[]);
+};
+
 export function useServiceRequests() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
 
-  const fetchRequests = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('service_requests')
-        .select(`
-          *,
-          customer:customer_accounts(name, whatsapp_number, balance, balance_sar, balance_yer, balance_usd)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const parsedRequests = (data || []).map((r: any) => ({
+  const refetch = () => {
+    const reqs = loadArray<ServiceRequest>(REQUESTS_KEY);
+    const accounts = loadArray<LocalCustomerAccount>(ACCOUNTS_KEY);
+    const joined = reqs.map((r) => {
+      const c = accounts.find((a) => a.id === r.customer_id);
+      return {
         ...r,
-        status: r.status as ServiceRequestStatus,
-        customer: r.customer ? {
-          name: r.customer.name,
-          whatsapp_number: r.customer.whatsapp_number,
-          balance: r.customer.balance,
-          balance_sar: r.customer.balance_sar,
-          balance_yer: r.customer.balance_yer,
-          balance_usd: r.customer.balance_usd,
+        customer: c ? {
+          name: c.name,
+          whatsapp_number: c.whatsapp_number,
+          balance: Number(c.balance || 0),
+          balance_sar: c.balance_sar,
+          balance_yer: c.balance_yer,
+          balance_usd: c.balance_usd,
         } : undefined,
-      }));
-
-      setRequests(parsedRequests);
-      setPendingCount(parsedRequests.filter((r: ServiceRequest) => 
-        r.status === 'pending' || r.status === 'processing'
-      ).length);
-    } catch (err) {
-      console.error('Error fetching service requests:', err);
-    } finally {
-      setIsLoading(false);
-    }
+      } as ServiceRequest;
+    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setRequests(joined);
+    setIsLoading(false);
   };
 
-  // Deduct balance when creating request
+  useEffect(() => {
+    refetch();
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === REQUESTS_KEY || e.key === ACCOUNTS_KEY) refetch();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const pendingCount = useMemo(
+    () => requests.filter((r) => r.status === 'pending' || r.status === 'processing').length,
+    [requests]
+  );
+
   const createRequest = async (request: {
     customer_id: string;
     service_id: string;
@@ -89,45 +128,32 @@ export function useServiceRequests() {
     customer_email?: string;
   }) => {
     try {
-      // First get current balance
-      const balanceColumn = getBalanceColumn(request.currency);
-      const { data: customerData, error: fetchError } = await supabase
-        .from('customer_accounts')
-        .select(balanceColumn)
-        .eq('id', request.customer_id)
-        .single();
+      // Deduct balance locally
+      adjustBalance(request.customer_id, request.currency, -Number(request.price || 0));
 
-      if (fetchError) throw fetchError;
+      const now = new Date().toISOString();
+      const req: ServiceRequest = {
+        id: `req_${Date.now()}`,
+        customer_id: request.customer_id,
+        service_id: request.service_id,
+        service_name: request.service_name,
+        period_name: request.period_name,
+        period_days: request.period_days,
+        price: Number(request.price || 0),
+        currency: request.currency,
+        status: 'pending',
+        admin_notes: null,
+        customer_email: request.customer_email || null,
+        created_at: now,
+        updated_at: now,
+      };
 
-      const currentBalance = (customerData as any)?.[balanceColumn] || 0;
-      const newBalance = currentBalance - request.price;
-
-      // Deduct balance
-      const { error: updateError } = await supabase
-        .from('customer_accounts')
-        .update({ [balanceColumn]: newBalance })
-        .eq('id', request.customer_id);
-
-      if (updateError) throw updateError;
-
-      // Create request
-      const { error } = await supabase
-        .from('service_requests')
-        .insert([{
-          customer_id: request.customer_id,
-          service_id: request.service_id,
-          service_name: request.service_name,
-          period_name: request.period_name,
-          period_days: request.period_days,
-          price: request.price,
-          currency: request.currency,
-          customer_email: request.customer_email || null,
-        }]);
-
-      if (error) throw error;
+      const reqs = loadArray<ServiceRequest>(REQUESTS_KEY);
+      reqs.unshift(req);
+      saveArray(REQUESTS_KEY, reqs);
 
       toast.success('تم إرسال طلب الخدمة وخصم الرصيد بنجاح');
-      fetchRequests();
+      refetch();
       return true;
     } catch (err) {
       console.error('Error creating service request:', err);
@@ -136,46 +162,29 @@ export function useServiceRequests() {
     }
   };
 
-  // Refund balance
-  const refundBalance = async (customerId: string, amount: number, currency: string) => {
-    const balanceColumn = getBalanceColumn(currency);
-    const { data: customerData, error: fetchError } = await supabase
-      .from('customer_accounts')
-      .select(balanceColumn)
-      .eq('id', customerId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    const currentBalance = (customerData as any)?.[balanceColumn] || 0;
-    const newBalance = currentBalance + amount;
-
-    const { error: updateError } = await supabase
-      .from('customer_accounts')
-      .update({ [balanceColumn]: newBalance })
-      .eq('id', customerId);
-
-    if (updateError) throw updateError;
-  };
-
   const updateRequestStatus = async (
-    id: string, 
+    id: string,
     status: ServiceRequestStatus,
     admin_notes?: string,
     request?: ServiceRequest
   ) => {
     try {
-      // If rejecting or failing, refund the balance
+      // Refund balance if rejecting/failing
       if ((status === 'rejected' || status === 'failed') && request) {
-        await refundBalance(request.customer_id, request.price, request.currency);
+        adjustBalance(request.customer_id, request.currency, Number(request.price || 0));
       }
 
-      const { error } = await supabase
-        .from('service_requests')
-        .update({ status, admin_notes })
-        .eq('id', id);
+      const reqs = loadArray<ServiceRequest>(REQUESTS_KEY);
+      const idx = reqs.findIndex((r) => r.id === id);
+      if (idx === -1) return false;
 
-      if (error) throw error;
+      reqs[idx] = {
+        ...reqs[idx],
+        status,
+        admin_notes: typeof admin_notes === 'string' ? admin_notes : (reqs[idx].admin_notes || null),
+        updated_at: new Date().toISOString(),
+      };
+      saveArray(REQUESTS_KEY, reqs);
 
       const statusMessages: Record<ServiceRequestStatus, string> = {
         pending: 'تم تحويل الطلب إلى معلق',
@@ -187,7 +196,7 @@ export function useServiceRequests() {
       };
 
       toast.success(statusMessages[status]);
-      fetchRequests();
+      refetch();
       return true;
     } catch (err) {
       console.error('Error updating request status:', err);
@@ -198,24 +207,14 @@ export function useServiceRequests() {
 
   const deleteRequest = async (id: string, request?: ServiceRequest) => {
     try {
-      // Refund balance if request is not activated yet
       if (request && request.status !== 'activated') {
-        await refundBalance(request.customer_id, request.price, request.currency);
+        adjustBalance(request.customer_id, request.currency, Number(request.price || 0));
       }
 
-      const { error } = await supabase
-        .from('service_requests')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      if (request && request.status !== 'activated') {
-        toast.success('تم حذف الطلب واسترداد الرصيد');
-      } else {
-        toast.success('تم حذف الطلب');
-      }
-      fetchRequests();
+      const reqs = loadArray<ServiceRequest>(REQUESTS_KEY).filter((r) => r.id !== id);
+      saveArray(REQUESTS_KEY, reqs);
+      toast.success('تم حذف الطلب');
+      refetch();
       return true;
     } catch (err) {
       console.error('Error deleting request:', err);
@@ -224,41 +223,6 @@ export function useServiceRequests() {
     }
   };
 
-  // Initial fetch
-  useEffect(() => {
-    fetchRequests();
-  }, []);
-
-  // Subscribe to realtime updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('service_requests_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'service_requests',
-        },
-        (payload) => {
-          console.log('Service request change:', payload);
-          fetchRequests();
-          
-          // Show notification for new requests
-          if (payload.eventType === 'INSERT') {
-            toast.info('🔔 طلب خدمة جديد!', {
-              duration: 5000,
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   return {
     requests,
     isLoading,
@@ -266,6 +230,7 @@ export function useServiceRequests() {
     createRequest,
     updateRequestStatus,
     deleteRequest,
-    refetch: fetchRequests,
+    refetch,
   };
 }
+
