@@ -88,7 +88,7 @@ const Subscriptions = () => {
   const [whatsAppData, setWhatsAppData] = useState<{ customerName: string; whatsappNumber: string; message: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
-  // Supabase removed: load customers from localStorage only.
+  // Customers are loaded from localStorage only.
   const loadCustomers = () => {
     const raw = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
     if (!raw) {
@@ -184,7 +184,7 @@ const Subscriptions = () => {
 
   // Send WhatsApp notification to customer
   const sendWhatsAppNotification = async (_subscription: Subscription, _customerWhatsapp: string) => {
-    // Supabase removed: WhatsApp sending disabled.
+    // WhatsApp sending from backend is disabled.
     return;
   };
 

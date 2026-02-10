@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ServiceRequestStatus } from '@/types/serviceRequests';
 
-// Supabase removed: localStorage-backed service requests.
+// Service requests are stored in localStorage.
 
 export interface ServiceRequest {
   id: string;
@@ -233,4 +233,3 @@ export function useServiceRequests() {
     refetch,
   };
 }
-

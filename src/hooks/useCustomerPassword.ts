@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 
-// Supabase removed: store customer accounts locally.
+// Customer accounts are stored locally.
 
 export const CUSTOMER_ACCOUNTS_KEY = 'app_customer_accounts';
 
@@ -122,4 +122,3 @@ export const updateCustomerBalance = async (
 export const createCustomerSubscription = async (): Promise<boolean> => {
   return true;
 };
-

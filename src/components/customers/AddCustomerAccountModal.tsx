@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { CUSTOMER_ACCOUNTS_KEY } from '@/hooks/useCustomerPassword';
 
 const countries = [
   { name: 'السعودية', code: 'SA', phoneCode: '+966' },
@@ -45,6 +45,21 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
+  const loadAccounts = (): any[] => {
+    try {
+      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveAccounts = (accounts: any[]) => {
+    localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -65,33 +80,34 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
       const fullWhatsappNumber = `${formData.countryCode}${formData.phone}`.replace(/\+/g, '');
       const activationCode = generateActivationCode();
 
-      // Check if phone number already exists
-      const { data: existing } = await supabase
-        .from('customer_accounts')
-        .select('id')
-        .eq('whatsapp_number', fullWhatsappNumber)
-        .single();
-
+      // Check if phone number already exists (local storage)
+      const accounts = loadAccounts();
+      const existing = accounts.find((a) => String(a?.whatsapp_number || '').trim() === String(fullWhatsappNumber).trim());
       if (existing) {
         toast.error('رقم الهاتف مسجل مسبقاً');
         setIsLoading(false);
         return;
       }
 
-      const { error } = await supabase
-        .from('customer_accounts')
-        .insert({
-          name: formData.name.trim(),
-          whatsapp_number: fullWhatsappNumber,
-          password_hash: formData.password,
-          currency: formData.currency,
-          activation_code: activationCode,
-          is_activated: false,
-          is_admin: false,
-          account_type: 'customer',
-        });
-
-      if (error) throw error;
+      const now = new Date().toISOString();
+      accounts.unshift({
+        id: `cust_${Date.now()}`,
+        name: formData.name.trim(),
+        whatsapp_number: fullWhatsappNumber,
+        password_hash: formData.password,
+        currency: formData.currency,
+        activation_code: activationCode,
+        is_activated: false,
+        is_admin: false,
+        account_type: 'customer',
+        status: 'inactive',
+        created_at: now,
+        balance: 0,
+        balance_sar: 0,
+        balance_yer: 0,
+        balance_usd: 0,
+      });
+      saveAccounts(accounts);
 
       toast.success('تم إنشاء حساب العميل بنجاح');
       setFormData({

@@ -140,7 +140,7 @@ export const AddSubscriptionModal = ({
     }
   }, [isOpen]);
 
-  // Supabase removed: derive "shared slots" from legacy services in localStorage.
+  // Derive "shared slots" from legacy services in localStorage.
   useEffect(() => {
     if (formData.subscriptionType !== 'shared') return;
     if (!selectedLegacySharedServiceId) {

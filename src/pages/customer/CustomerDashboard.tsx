@@ -151,7 +151,7 @@ export default function CustomerDashboard() {
   }, [navigate]);
 
   const fetchUpdatedBalance = async (_customerId: string) => {
-    // Supabase removed: keep balances from local session only.
+    // Keep balances from local session only.
   };
 
   const fetchSubscriptions = async (customerId: string) => {
@@ -171,7 +171,7 @@ export default function CustomerDashboard() {
     );
   }, [subscriptions]);
 
-  // Supabase removed: no realtime. Keep a simple in-browser sync via storage events.
+  // No realtime. Keep a simple in-browser sync via storage events.
   useEffect(() => {
     if (!customer?.id) return;
 
@@ -218,16 +218,23 @@ export default function CustomerDashboard() {
     if (!customer) return;
 
     try {
-      // Create renewal request in database
-      const { error } = await supabase
-        .from('renewal_requests')
-        .insert({
+      // Store renewal requests locally (admin can review from local data if needed).
+      try {
+        const key = 'app_renewal_requests';
+        const raw = localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const arr = Array.isArray(parsed) ? parsed : [];
+        arr.unshift({
+          id: `ren_${Date.now()}`,
           customer_id: customer.id,
           subscription_id: subscription.id,
-          status: 'pending'
+          status: 'pending',
+          created_at: new Date().toISOString(),
         });
-
-      if (error) throw error;
+        localStorage.setItem(key, JSON.stringify(arr));
+      } catch {
+        // ignore local persistence issues; WhatsApp message is the main path.
+      }
 
       // Send WhatsApp message
       const message = encodeURIComponent(
@@ -732,7 +739,7 @@ export default function CustomerDashboard() {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border py-2 px-3">
-        <div className="max-w-lg mx-auto flex flex-wrap justify-between gap-1">
+        <div className="max-w-lg mx-auto grid grid-cols-5 gap-1">
           <button
             onClick={() => setActiveTab('home')}
             className={`flex flex-1 min-w-[64px] flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${

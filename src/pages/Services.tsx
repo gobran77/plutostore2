@@ -112,7 +112,7 @@ const Services = () => {
       }
     }
 
-    // Supabase removed: customers are loaded from localStorage only.
+    // Customers are loaded from localStorage only.
 
     // Load payment methods
     const savedPaymentMethods = localStorage.getItem(PAYMENT_METHODS_KEY);

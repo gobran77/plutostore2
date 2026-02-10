@@ -16,9 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getCurrencySymbol } from '@/types/currency';
+import { CUSTOMER_ACCOUNTS_KEY, LocalCustomerAccount } from '@/hooks/useCustomerPassword';
 
 interface Subscription {
   id: string;
@@ -84,6 +84,79 @@ export function AdminCustomerControls({
     }
   };
 
+  const loadAccounts = (): LocalCustomerAccount[] => {
+    try {
+      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveAccounts = (accounts: LocalCustomerAccount[]) => {
+    localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
+  };
+
+  const adjustAccountBalance = (currency: 'SAR' | 'YER' | 'USD', newBalance: number) => {
+    const accounts = loadAccounts();
+    const idx = accounts.findIndex((a) => a.id === customerId);
+    if (idx === -1) return false;
+    const field = getBalanceField(currency);
+    (accounts[idx] as any)[field] = newBalance;
+    saveAccounts(accounts);
+    return true;
+  };
+
+  const updateLocalSubscription = (subId: string, patch: { service_name?: string; price?: number; end_date?: string }) => {
+    try {
+      const raw = localStorage.getItem('app_subscriptions');
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return false;
+      const updated = parsed.map((s: any) => {
+        if (String(s?.id || '') !== subId) return s;
+        const next: any = { ...s };
+        if (patch.service_name) {
+          // Update service name for display only; keep services array if present.
+          if (Array.isArray(next.services) && next.services.length > 0) {
+            next.services = next.services.map((x: any) => ({ ...x, serviceName: patch.service_name }));
+          }
+          next.service_name = patch.service_name;
+        }
+        if (typeof patch.price === 'number') {
+          next.totalPrice = patch.price;
+          if (Array.isArray(next.services) && next.services.length > 0) {
+            next.services = next.services.map((x: any) => ({ ...x, price: patch.price }));
+          }
+        }
+        if (patch.end_date) {
+          next.endDate = patch.end_date;
+          next.end_date = patch.end_date;
+        }
+        return next;
+      });
+      localStorage.setItem('app_subscriptions', JSON.stringify(updated));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const deleteLocalSubscription = (subId: string) => {
+    try {
+      const raw = localStorage.getItem('app_subscriptions');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const updated = parsed.filter((s: any) => String(s?.id || '') !== subId);
+      localStorage.setItem('app_subscriptions', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
   const handleAdjustBalance = async () => {
     if (!adjustmentAmount || isNaN(Number(adjustmentAmount))) {
       toast.error('أدخل مبلغ صحيح');
@@ -104,13 +177,8 @@ export function AdminCustomerControls({
         newBalance = amount;
       }
 
-      const balanceField = getBalanceField(selectedCurrency);
-      const { error } = await supabase
-        .from('customer_accounts')
-        .update({ [balanceField]: newBalance })
-        .eq('id', customerId);
-
-      if (error) throw error;
+      const ok = adjustAccountBalance(selectedCurrency, newBalance);
+      if (!ok) throw new Error('account_not_found');
 
       toast.success(`تم تعديل رصيد ${getCurrencySymbol(selectedCurrency)} بنجاح`);
       setActiveModal(null);
@@ -129,12 +197,7 @@ export function AdminCustomerControls({
 
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from('customer_subscriptions')
-        .delete()
-        .eq('id', subscriptionId);
-
-      if (error) throw error;
+      deleteLocalSubscription(subscriptionId);
 
       toast.success('تم حذف الاشتراك بنجاح');
       onUpdate();
@@ -159,16 +222,12 @@ export function AdminCustomerControls({
 
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from('customer_subscriptions')
-        .update({
-          service_name: editServiceName,
-          price: Number(editPrice),
-          end_date: new Date(editEndDate).toISOString(),
-        })
-        .eq('id', selectedSubscription.id);
-
-      if (error) throw error;
+      const ok = updateLocalSubscription(selectedSubscription.id, {
+        service_name: editServiceName,
+        price: Number(editPrice),
+        end_date: new Date(editEndDate).toISOString(),
+      });
+      if (!ok) throw new Error('subscription_not_found');
 
       toast.success('تم تعديل الاشتراك بنجاح');
       setActiveModal(null);
@@ -185,26 +244,21 @@ export function AdminCustomerControls({
   const handleResetStats = async () => {
     setIsLoading(true);
     try {
-      // Reset all balances to 0
-      const { error: balanceError } = await supabase
-        .from('customer_accounts')
-        .update({ 
-          balance: 0,
-          balance_sar: 0,
-          balance_yer: 0,
-          balance_usd: 0
-        })
-        .eq('id', customerId);
+      adjustAccountBalance('SAR', 0);
+      adjustAccountBalance('YER', 0);
+      adjustAccountBalance('USD', 0);
 
-      if (balanceError) throw balanceError;
-
-      // Delete all subscriptions
-      const { error: subsError } = await supabase
-        .from('customer_subscriptions')
-        .delete()
-        .eq('customer_id', customerId);
-
-      if (subsError) throw subsError;
+      // Delete all subscriptions for this customer
+      try {
+        const raw = localStorage.getItem('app_subscriptions');
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) {
+          const updated = parsed.filter((s: any) => String(s?.customerId || '') !== customerId);
+          localStorage.setItem('app_subscriptions', JSON.stringify(updated));
+        }
+      } catch {
+        // ignore
+      }
 
       toast.success('تم تصفير جميع البيانات بنجاح');
       setActiveModal(null);

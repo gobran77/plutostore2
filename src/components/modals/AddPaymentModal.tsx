@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X, FileText, User } from 'lucide-react';
 import { PaymentMethodType } from './PaymentMethodsModal';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { CUSTOMER_ACCOUNTS_KEY } from '@/hooks/useCustomerPassword';
 
 interface AddPaymentModalProps {
   isOpen: boolean;
@@ -66,14 +66,22 @@ export const AddPaymentModal = ({
   const loadCustomers = async () => {
     setLoadingCustomers(true);
     try {
-      const { data, error } = await supabase
-        .from('customer_accounts')
-        .select('id, name, whatsapp_number, balance_sar, balance_yer, balance_usd')
-        .eq('is_activated', true)
-        .order('name');
-      
-      if (error) throw error;
-      setCustomers(data || []);
+      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
+      const accounts = raw ? JSON.parse(raw) : [];
+      const list = (Array.isArray(accounts) ? accounts : [])
+        .filter((a: any) => !a?.is_admin && a?.account_type !== 'admin')
+        .filter((a: any) => a?.is_activated === true)
+        .filter((a: any) => (a?.status || 'active') !== 'blocked')
+        .map((a: any) => ({
+          id: String(a.id),
+          name: String(a.name || ''),
+          whatsapp_number: String(a.whatsapp_number || ''),
+          balance_sar: Number(a.balance_sar || 0),
+          balance_yer: Number(a.balance_yer || 0),
+          balance_usd: Number(a.balance_usd || 0),
+        }))
+        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name), 'ar'));
+      setCustomers(list);
     } catch (error) {
       console.error('Error loading customers:', error);
       toast.error('فشل في تحميل العملاء');
@@ -129,14 +137,15 @@ export const AddPaymentModal = ({
         const currentBalance = getCustomerBalance(selectedCustomer, currency);
         const newBalance = currentBalance + amount;
 
-        // Update customer balance in database
+        // Update customer balance locally in app_customer_accounts
         const updateField = `balance_${currency.toLowerCase()}`;
-        const { error } = await supabase
-          .from('customer_accounts')
-          .update({ [updateField]: newBalance })
-          .eq('id', selectedCustomer.id);
-
-        if (error) throw error;
+        const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
+        const accounts = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(accounts)) throw new Error('invalid_accounts');
+        const idx = accounts.findIndex((a: any) => String(a?.id || '') === String(selectedCustomer.id));
+        if (idx === -1) throw new Error('account_not_found');
+        accounts[idx] = { ...accounts[idx], [updateField]: newBalance };
+        localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
 
         // Add to payments list
         onAdd({

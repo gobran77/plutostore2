@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 
-// Supabase removed: localStorage-backed tickets/messages.
+// Tickets/messages are stored in localStorage.
 
 export interface TicketMessage {
   id: string;
@@ -245,7 +245,7 @@ export function useTicketMessages(ticketId: string | null) {
   };
 
   const uploadFile = async () => {
-    toast.error('رفع الملفات غير متاح بدون Supabase');
+    toast.error('رفع الملفات غير متاح حالياً');
     return null;
   };
 
@@ -263,4 +263,3 @@ export function useTicketMessages(ticketId: string | null) {
 
   return { messages, isLoading, sendMessage, uploadFile, refetch: fetchMessages };
 }
-

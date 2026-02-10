@@ -11,10 +11,10 @@ import { AdjustBalanceModal } from '@/components/customers/AdjustBalanceModal';
 import { EditCustomerModal } from '@/components/modals/EditCustomerModal';
 import { Phone, Filter, Download, Edit, Trash2, Eye, MessageCircle, Key, Copy, Check, Send, Wallet, ExternalLink, UserCheck, UserX, Ban } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Customer } from '@/types';
+import { CUSTOMER_ACCOUNTS_KEY } from '@/hooks/useCustomerPassword';
 
 type CustomerStatus = 'active' | 'inactive' | 'blocked';
 
@@ -54,50 +54,82 @@ const Customers = () => {
   // Admin WhatsApp number
   const adminWhatsApp = '201030638992';
 
-  // Fetch customers from database
+  const loadAccounts = (): any[] => {
+    try {
+      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveAccounts = (accounts: any[]) => {
+    localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
+  };
+
+  const updateCachedCustomers = (customerData: CustomerAccount[]) => {
+    const cached: Customer[] = customerData.map((c) => ({
+      id: c.id,
+      name: c.name,
+      email: '',
+      whatsapp: c.whatsapp_number,
+      currency: c.currency || 'SAR',
+      status: c.status,
+      createdAt: new Date(c.created_at),
+    }));
+    localStorage.setItem('app_customers', JSON.stringify(cached));
+  };
+
+  const removeFromArrayStorage = (key: string, predicate: (x: any) => boolean) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const next = parsed.filter((x) => !predicate(x));
+      if (next.length === 0) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
+
+  // Fetch customers from localStorage
   const fetchCustomers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('customer_accounts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      // Filter out admin accounts and cast to proper type
-      const customerData = (data || [])
-        .filter((c: any) => !c.is_admin && c.account_type !== 'admin')
-        .map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          whatsapp_number: c.whatsapp_number,
-          balance: c.balance || 0,
-          currency: c.currency || 'SAR',
-          balances: {
-            balance_sar: c.balance_sar || 0,
-            balance_yer: c.balance_yer || 0,
-            balance_usd: c.balance_usd || 0,
-          },
-          is_admin: c.is_admin || false,
-          is_activated: c.is_activated || false,
-          activation_code: c.activation_code,
-          account_type: c.account_type || 'customer',
-          status: (c.status as CustomerStatus) || 'active',
-          created_at: c.created_at,
-        }));
+      const accounts = loadAccounts();
+      const customerData: CustomerAccount[] = accounts
+        .filter((c: any) => !c?.is_admin && c?.account_type !== 'admin')
+        .map((c: any) => {
+          const createdAt = c?.created_at ? String(c.created_at) : new Date().toISOString();
+          const isActivated = Boolean(c?.is_activated);
+          const status: CustomerStatus =
+            (c?.status as CustomerStatus) || (isActivated ? 'active' : 'inactive');
+          return {
+            id: String(c?.id || ''),
+            name: String(c?.name || ''),
+            whatsapp_number: String(c?.whatsapp_number || ''),
+            balance: Number(c?.balance || 0),
+            currency: String(c?.currency || 'SAR'),
+            balances: {
+              balance_sar: Number(c?.balance_sar || 0),
+              balance_yer: Number(c?.balance_yer || 0),
+              balance_usd: Number(c?.balance_usd || 0),
+            },
+            is_admin: Boolean(c?.is_admin),
+            is_activated: isActivated,
+            activation_code: c?.activation_code ?? null,
+            account_type: String(c?.account_type || 'customer'),
+            status,
+            created_at: createdAt,
+          };
+        })
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       setCustomers(customerData);
-      // Cache a simplified list in localStorage so other screens can re-use it.
-      const cached: Customer[] = customerData.map((c) => ({
-        id: c.id,
-        name: c.name,
-        email: '',
-        whatsapp: c.whatsapp_number,
-        currency: c.currency || 'SAR',
-        status: c.status,
-        createdAt: new Date(c.created_at),
-      }));
-      localStorage.setItem('app_customers', JSON.stringify(cached));
+      updateCachedCustomers(customerData);
     } catch (err) {
       console.error('Error fetching customers:', err);
       toast.error('حدث خطأ في تحميل العملاء');
@@ -131,19 +163,43 @@ const Customers = () => {
       // Remove from UI immediately for better UX
       setCustomers(prevCustomers => prevCustomers.filter(c => c.id !== selectedCustomer.id));
       setIsDeleteModalOpen(false);
-      
-      const { error } = await supabase
-        .from('customer_accounts')
-        .delete()
-        .eq('id', selectedCustomer.id);
 
-      if (error) {
-        // If delete fails, restore the customer in UI
-        console.error('Error deleting customer:', error);
-        toast.error('حدث خطأ في حذف العميل');
-        fetchCustomers(); // Reload to restore correct state
-        return;
+      // Remove from accounts (portal auth + balances)
+      const accounts = loadAccounts();
+      const nextAccounts = accounts.filter((a: any) => String(a?.id || '') !== String(selectedCustomer.id));
+      saveAccounts(nextAccounts);
+
+      // Remove from cached customers list
+      removeFromArrayStorage('app_customers', (c) => String(c?.id || '') === String(selectedCustomer.id));
+
+      // Remove all subscriptions for this customer
+      removeFromArrayStorage('app_subscriptions', (s) => String(s?.customerId || '') === String(selectedCustomer.id));
+
+      // Remove service requests
+      removeFromArrayStorage('app_service_requests', (r) => String(r?.customer_id || '') === String(selectedCustomer.id));
+
+      // Remove tickets + ticket messages
+      const ticketIds: string[] = (() => {
+        try {
+          const raw = localStorage.getItem('app_support_tickets');
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(parsed)) return [];
+          return parsed
+            .filter((t: any) => String(t?.customer_id || '') === String(selectedCustomer.id))
+            .map((t: any) => String(t?.id || ''))
+            .filter(Boolean);
+        } catch {
+          return [];
+        }
+      })();
+      removeFromArrayStorage('app_support_tickets', (t) => String(t?.customer_id || '') === String(selectedCustomer.id));
+      if (ticketIds.length > 0) {
+        removeFromArrayStorage('app_ticket_messages', (m) => ticketIds.includes(String(m?.ticket_id || '')));
       }
+
+      // Remove invoices/payments that belong to this customer
+      removeFromArrayStorage('app_invoices', (inv) => String(inv?.customerId || '') === String(selectedCustomer.id));
+      removeFromArrayStorage('app_payments', (pay) => String(pay?.customerId || '') === String(selectedCustomer.id));
 
       toast.success('تم حذف العميل بنجاح');
       setSelectedCustomer(null);
@@ -156,21 +212,25 @@ const Customers = () => {
 
   const updateCustomerStatus = async (customer: CustomerAccount, newStatus: CustomerStatus) => {
     try {
-      const { error } = await supabase
-        .from('customer_accounts')
-        .update({ is_activated: newStatus === 'active' })
-        .eq('id', customer.id);
+      const accounts = loadAccounts();
+      const idx = accounts.findIndex((a: any) => String(a?.id || '') === String(customer.id));
+      if (idx === -1) throw new Error('account_not_found');
 
-      if (error) throw error;
+      accounts[idx] = {
+        ...accounts[idx],
+        status: newStatus,
+        is_activated: newStatus === 'active',
+      };
+      saveAccounts(accounts);
 
-      setCustomers(customers.map(c => 
-        c.id === customer.id ? { ...c, status: newStatus } : c
+      setCustomers(customers.map(c =>
+        c.id === customer.id ? { ...c, status: newStatus, is_activated: newStatus === 'active' } : c
       ));
-
-      // Update local state
-      setCustomers(customers.map(c => 
-        c.id === customer.id ? { ...c, status: newStatus } : c
-      ));
+      updateCachedCustomers(
+        customers.map(c =>
+          c.id === customer.id ? { ...c, status: newStatus, is_activated: newStatus === 'active' } : c
+        )
+      );
       toast.success(`تم تحديث حالة العميل`);
     } catch (err) {
       console.error('Error updating customer status:', err);
@@ -190,27 +250,32 @@ const Customers = () => {
 
   const handleSaveCustomer = async (updatedCustomer: Customer) => {
     try {
-      const { error } = await supabase
-        .from('customer_accounts')
-        .update({
-          name: updatedCustomer.name,
-          whatsapp_number: updatedCustomer.whatsapp,
-          currency: updatedCustomer.currency,
-          status: updatedCustomer.status,
-        })
-        .eq('id', updatedCustomer.id);
+      const accounts = loadAccounts();
+      const idx = accounts.findIndex((a: any) => String(a?.id || '') === String(updatedCustomer.id));
+      if (idx === -1) throw new Error('account_not_found');
+      accounts[idx] = {
+        ...accounts[idx],
+        name: updatedCustomer.name,
+        whatsapp_number: String(updatedCustomer.whatsapp || '').replace(/\D/g, ''),
+        currency: updatedCustomer.currency,
+        status: updatedCustomer.status,
+        is_activated: updatedCustomer.status === 'active',
+      };
+      saveAccounts(accounts);
 
-      if (error) throw error;
-
-      setCustomers(customers.map(c => 
+      const next = customers.map(c => 
         c.id === updatedCustomer.id ? { 
           ...c, 
           name: updatedCustomer.name,
-          whatsapp_number: updatedCustomer.whatsapp,
+          whatsapp_number: String(updatedCustomer.whatsapp || '').replace(/\D/g, ''),
           currency: updatedCustomer.currency,
           status: updatedCustomer.status,
+          is_activated: updatedCustomer.status === 'active',
         } : c
-      ));
+      );
+
+      setCustomers(next);
+      updateCachedCustomers(next);
 
       toast.success('تم تحديث بيانات العميل بنجاح');
     } catch (err) {
@@ -246,16 +311,22 @@ const Customers = () => {
 
   const activateCustomer = async (customer: CustomerAccount) => {
     try {
-      const { error } = await supabase
-        .from('customer_accounts')
-        .update({ is_activated: true })
-        .eq('id', customer.id);
+      const accounts = loadAccounts();
+      const idx = accounts.findIndex((a: any) => String(a?.id || '') === String(customer.id));
+      if (idx === -1) throw new Error('account_not_found');
 
-      if (error) throw error;
+      accounts[idx] = {
+        ...accounts[idx],
+        is_activated: true,
+        status: 'active',
+      };
+      saveAccounts(accounts);
 
-      setCustomers(customers.map(c => 
-        c.id === customer.id ? { ...c, is_activated: true } : c
-      ));
+      const next = customers.map(c =>
+        c.id === customer.id ? { ...c, is_activated: true, status: 'active' } : c
+      );
+      setCustomers(next);
+      updateCachedCustomers(next);
       toast.success('تم تفعيل الحساب بنجاح');
     } catch (err) {
       console.error('Error activating customer:', err);

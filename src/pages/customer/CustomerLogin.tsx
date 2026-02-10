@@ -109,7 +109,7 @@ export default function CustomerLogin() {
           localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
         }
 
-        // Supabase removed: no WhatsApp sending from backend.
+        // No WhatsApp sending from backend.
         toast.info('تم إنشاء كود تفعيل. أدخله للمتابعة');
 
         // All customers must enter activation code every time
