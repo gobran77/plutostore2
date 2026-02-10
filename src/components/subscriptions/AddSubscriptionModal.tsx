@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Calendar, CreditCard, Building2, Wallet, Banknote, Mail } from 'lucide-react';
 import { Customer, SubscriptionService, Subscription, PaymentStatus, SubscriptionPaymentMethod } from '@/types';
 import { Service } from '@/types/services';
 import { CustomerSearchSelect } from './CustomerSearchSelect';
 import { PaymentMethodType } from '@/components/modals/PaymentMethodsModal';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 // Subscription types
@@ -31,6 +30,7 @@ interface AvailableSlot {
   assigned_customer_id?: string | null;
   accountName?: string;
   subscriptionsCount?: number;
+  password?: string | null;
 }
 
 const currencies = [
@@ -70,7 +70,7 @@ const getMethodIcon = (type: string) => {
   }
 };
 
-export const AddSubscriptionModal = ({ 
+export const AddSubscriptionModal = ({
   isOpen, 
   onClose, 
   onAdd, 
@@ -94,12 +94,9 @@ export const AddSubscriptionModal = ({
 
   // Shared subscription state
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
-  // Legacy selection (UI) -> mapped to Supabase service id for slots.
+  // Legacy selection (UI).
   const [selectedLegacySharedServiceId, setSelectedLegacySharedServiceId] = useState<string>('');
-  const [selectedSharedServiceId, setSelectedSharedServiceId] = useState<string>(''); // Supabase service id
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
-  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-  const slotsRequestIdRef = useRef(0);
 
   const [subscriptionServices, setSubscriptionServices] = useState<SubscriptionService[]>([
     { id: '1', serviceName: '', price: 0, cost: 0 }
@@ -143,199 +140,34 @@ export const AddSubscriptionModal = ({
     }
   }, [isOpen]);
 
-  const ensureSupabaseSharedFromLegacy = async (legacyServiceId: string) => {
-    const legacyService = services.find((s) => s.id === legacyServiceId);
-    if (!legacyService) return;
-
-    try {
-      // 1) Ensure service exists in Supabase by name
-      const { data: existingSvc, error: svcErr } = await supabase
-        .from('services')
-        .select('id, name, default_type')
-        .eq('name', legacyService.name)
-        .maybeSingle();
-
-      if (svcErr) throw svcErr;
-
-      let supabaseServiceId = existingSvc?.id as string | undefined;
-      if (!supabaseServiceId) {
-        const { data: insertedSvc, error: insertSvcErr } = await supabase
-          .from('services')
-          .insert({
-            name: legacyService.name,
-            description: legacyService.description || null,
-            default_type: 'shared',
-            is_active: true,
-            pricing: [],
-          })
-          .select('id')
-          .single();
-
-        if (insertSvcErr) throw insertSvcErr;
-        supabaseServiceId = insertedSvc.id;
-      }
-
-      // 2) Ensure a shared account exists for this service
-      const { data: accounts, error: accErr } = await supabase
-        .from('service_accounts')
-        .select('id, service_id, account_type, name')
-        .eq('service_id', supabaseServiceId)
-        .eq('account_type', 'shared');
-
-      if (accErr) throw accErr;
-
-      let sharedAccountId = accounts?.[0]?.id as string | undefined;
-      if (!sharedAccountId) {
-        const { data: insertedAcc, error: insertAccErr } = await supabase
-          .from('service_accounts')
-          .insert({
-            service_id: supabaseServiceId,
-            account_type: 'shared',
-            name: 'shared',
-          })
-          .select('id')
-          .single();
-        if (insertAccErr) throw insertAccErr;
-        sharedAccountId = insertedAcc.id;
-      }
-
-      // 3) Ensure slots (emails) exist for this account based on legacy shared emails
-      const legacySharedEmails =
-        legacyService.accounts
-          ?.filter((a: any) => a?.type === 'shared')
-          ?.flatMap((a: any) => Array.isArray(a?.sharedEmails) ? a.sharedEmails : []) || [];
-
-      const emailsToEnsure = legacySharedEmails
-        .map((e: any) => ({
-          email: String(e?.email || '').trim(),
-          password: e?.password ? String(e.password) : null,
-        }))
-        .filter((e: any) => e.email.length > 0);
-
-      if (emailsToEnsure.length > 0) {
-        const { data: existingSlots, error: slotsErr } = await supabase
-          .from('service_slots')
-          .select('id, email, password, account_id')
-          .eq('account_id', sharedAccountId);
-        if (slotsErr) throw slotsErr;
-
-        const byEmail = new Map<string, any>();
-        for (const s of existingSlots || []) {
-          if (s.email) byEmail.set(String(s.email).toLowerCase(), s);
-        }
-
-        const toInsert: any[] = [];
-        for (const e of emailsToEnsure) {
-          const existing = byEmail.get(e.email.toLowerCase());
-          if (!existing) {
-            toInsert.push({
-              account_id: sharedAccountId,
-              email: e.email,
-              password: e.password,
-              slot_name: null,
-              is_available: true,
-            });
-          } else if (e.password && e.password !== existing.password) {
-            // Keep password synced from legacy.
-            await supabase
-              .from('service_slots')
-              .update({ password: e.password })
-              .eq('id', existing.id);
-          }
-        }
-
-        if (toInsert.length > 0) {
-          const { error: insSlotsErr } = await supabase.from('service_slots').insert(toInsert);
-          if (insSlotsErr) throw insSlotsErr;
-        }
-      }
-
-      setSelectedSharedServiceId(supabaseServiceId);
-    } catch (err) {
-      console.error('Error ensuring shared service/slots:', err);
-      toast.error('تعذر تحميل الإيميلات لهذه الخدمة');
-    }
-  };
-
-  // Fetch available slots when shared service is selected
+  // Supabase removed: derive "shared slots" from legacy services in localStorage.
   useEffect(() => {
-    const requestId = ++slotsRequestIdRef.current;
+    if (formData.subscriptionType !== 'shared') return;
+    if (!selectedLegacySharedServiceId) {
+      setAvailableSlots([]);
+      setSelectedSlotId('');
+      return;
+    }
 
-    // Clear the previous service's slots immediately when changing service/type.
-    setAvailableSlots([]);
+    const legacyService = services.find((s) => s.id === selectedLegacySharedServiceId);
+    const sharedAccounts = legacyService?.accounts?.filter((a: any) => a?.type === 'shared') || [];
+    const sharedEmails = sharedAccounts.flatMap((a: any) => Array.isArray(a?.sharedEmails) ? a.sharedEmails : []);
+
+    const slots: AvailableSlot[] = sharedEmails.map((e: any) => ({
+      id: String(e?.id || ''),
+      email: e?.email ? String(e.email) : null,
+      password: e?.password ? String(e.password) : null,
+      slot_name: null,
+      account_id: sharedAccounts[0]?.id ? String(sharedAccounts[0].id) : 'legacy',
+      is_available: true,
+      assigned_customer_id: null,
+      accountName: 'الحساب المشترك',
+      subscriptionsCount: Array.isArray(e?.users) ? e.users.length : 0,
+    })).filter((s) => s.id.length > 0);
+
+    setAvailableSlots(slots);
     setSelectedSlotId('');
-
-    if (formData.subscriptionType === 'shared' && selectedSharedServiceId) {
-      fetchAvailableSlots(selectedSharedServiceId, requestId);
-    } else {
-      setIsLoadingSlots(false);
-    }
-  }, [formData.subscriptionType, selectedSharedServiceId]);
-
-  const fetchAvailableSlots = async (serviceId: string, requestId: number) => {
-    setIsLoadingSlots(true);
-    try {
-      // Fetch accounts for this service
-      const { data: accountsData, error: accountsError } = await supabase
-        .from('service_accounts')
-        .select('id, service_id, account_type, name')
-        .eq('service_id', serviceId)
-        .eq('account_type', 'shared');
-      
-      if (accountsError) throw accountsError;
-      
-      if (!accountsData || accountsData.length === 0) {
-        return;
-      }
-      
-      // Fetch available slots for these accounts
-      const accountIds = accountsData.map(a => a.id);
-      const { data: slotsData, error: slotsError } = await supabase
-        .from('service_slots')
-        .select('id, email, slot_name, account_id, is_available, assigned_customer_id')
-        .in('account_id', accountIds);
-      
-      if (slotsError) throw slotsError;
-      
-      // Map slots with account names
-      let slots: AvailableSlot[] = (slotsData || []).map(slot => {
-        const account = accountsData.find(a => a.id === slot.account_id);
-        return {
-          ...slot,
-          accountName: account?.name || undefined,
-        };
-      });
-
-      // Attach subscription counts (how many subscriptions use this slot)
-      const slotIds = slots.map((s) => s.id);
-      if (slotIds.length > 0) {
-        const { data: subs, error: subsErr } = await supabase
-          .from('customer_subscriptions')
-          .select('slot_id')
-          .in('slot_id', slotIds);
-        if (!subsErr && subs) {
-          const counts = new Map<string, number>();
-          for (const row of subs as any[]) {
-            const id = row?.slot_id;
-            if (!id) continue;
-            counts.set(id, (counts.get(id) || 0) + 1);
-          }
-          slots = slots.map((s) => ({ ...s, subscriptionsCount: counts.get(s.id) || 0 }));
-        }
-      }
-
-      // Ignore stale responses if the user selected another service quickly.
-      if (requestId !== slotsRequestIdRef.current) return;
-
-      setAvailableSlots(slots);
-    } catch (err) {
-      console.error('Error fetching slots:', err);
-    } finally {
-      if (requestId === slotsRequestIdRef.current) {
-        setIsLoadingSlots(false);
-      }
-    }
-  };
+  }, [formData.subscriptionType, selectedLegacySharedServiceId, services]);
 
   // Auto-fill service when shared service is selected
   useEffect(() => {
@@ -435,7 +267,7 @@ export const AddSubscriptionModal = ({
 
     // Validate based on subscription type
     if (formData.subscriptionType === 'shared') {
-      if (!selectedSharedServiceId) {
+      if (!selectedLegacySharedServiceId) {
         toast.error('يرجى اختيار خدمة مشتركة');
         return;
       }
@@ -480,6 +312,8 @@ export const AddSubscriptionModal = ({
       // Shared subscription data
       subscriptionType: formData.subscriptionType as 'private' | 'shared',
       slotId: selectedSlotId || undefined,
+      loginEmail: availableSlots.find((s) => s.id === selectedSlotId)?.email || undefined,
+      loginPassword: availableSlots.find((s) => s.id === selectedSlotId)?.password || undefined,
     });
     
     onClose();
@@ -646,11 +480,10 @@ export const AddSubscriptionModal = ({
                   onChange={(e) => {
                     const legacyId = e.target.value;
                     setSelectedLegacySharedServiceId(legacyId);
-                    setSelectedSharedServiceId('');
                     setSelectedSlotId('');
                     setAvailableSlots([]);
                     if (legacyId) {
-                      ensureSupabaseSharedFromLegacy(legacyId);
+                      // slots will be derived from legacy service data
                     }
                   }}
                   className="input-field"
@@ -663,18 +496,14 @@ export const AddSubscriptionModal = ({
               </div>
               
               {/* Select Available Slot/Email */}
-              {selectedSharedServiceId && (
+              {selectedLegacySharedServiceId && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
                     <Mail className="w-4 h-4 inline ml-1" />
                     الإيميل / السلوت المتاح <span className="text-destructive">*</span>
                   </label>
-                  
-                  {isLoadingSlots ? (
-                    <div className="text-center py-4 text-muted-foreground">
-                      جاري تحميل السلوتات المتاحة...
-                    </div>
-                  ) : availableSlots.length === 0 ? (
+
+                  {availableSlots.length === 0 ? (
                     <div className="text-center py-4 text-warning bg-warning/10 rounded-lg">
                       No emails found for this service
                     </div>

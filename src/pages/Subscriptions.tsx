@@ -12,7 +12,6 @@ import { Subscription, SubscriptionStatus, Customer, PaymentStatus } from '@/typ
 import { Service } from '@/types/services';
 import { Calendar, RefreshCw, Filter, Edit, Trash2, Eye, Download, Package, CreditCard, AlertCircle, Clock, Building2, Wallet, Banknote, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { 
   createInvoiceFromSubscription, 
   createPaymentFromSubscription, 
@@ -89,36 +88,23 @@ const Subscriptions = () => {
   const [whatsAppData, setWhatsAppData] = useState<{ customerName: string; whatsappNumber: string; message: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
-  // Load customers from Supabase
-  const loadCustomers = async () => {
+  // Supabase removed: load customers from localStorage only.
+  const loadCustomers = () => {
+    const raw = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
+    if (!raw) {
+      setCustomers([]);
+      return;
+    }
     try {
-      const { data, error } = await supabase
-        .from('customer_accounts')
-        .select('*')
-        .eq('is_admin', false)
-        .neq('account_type', 'admin')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Transform to Customer type
-      const customerData: Customer[] = (data || []).map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        email: '', // Not stored in customer_accounts
-        whatsapp: c.whatsapp_number,
-        status: 'active' as const,
-        createdAt: new Date(c.created_at),
-        currency: c.currency || 'SAR',
+      const parsed = JSON.parse(raw);
+      const customersWithDates = (Array.isArray(parsed) ? parsed : []).map((c: any) => ({
+        ...c,
+        createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
       }));
-
-      console.log('Loaded customers for subscriptions:', customerData.length);
-      setCustomers(customerData);
-
-      // Cache for other parts of the app (Services page, modals, etc.)
-      localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(customerData));
-    } catch (err) {
-      console.error('Error loading customers:', err);
+      setCustomers(customersWithDates);
+    } catch (e) {
+      console.error('Error loading customers:', e);
+      setCustomers([]);
     }
   };
 
@@ -163,7 +149,7 @@ const Subscriptions = () => {
       }
     }
 
-    // Load customers from Supabase
+    // Load customers from localStorage
     loadCustomers();
 
     // Load services from localStorage
@@ -197,51 +183,9 @@ const Subscriptions = () => {
   }, [subscriptions]);
 
   // Send WhatsApp notification to customer
-  const sendWhatsAppNotification = async (subscription: Subscription, customerWhatsapp: string) => {
-    const statusText = subscription.status === 'active' ? 'نشط' : subscription.status === 'expiring_soon' ? 'قريب من الانتهاء' : subscription.status === 'expired' ? 'منتهي' : subscription.status;
-    const paymentText = subscription.paymentStatus === 'paid' ? 'مدفوع' : subscription.paymentStatus === 'partial' ? `جزئي (${subscription.paidAmount} من ${subscription.totalPrice})` : 'آجل';
-    
-    const message = [
-      `🎉 *تم تفعيل اشتراكك بنجاح!*`,
-      ``,
-      `مرحباً ${subscription.customerName}،`,
-      ``,
-      `*تفاصيل الاشتراك:*`,
-      ``,
-      `📦 الخدمات:`,
-      ...subscription.services.map(s => `   • ${s.serviceName}: ${s.price} ${subscription.currency}`),
-      ``,
-      `📅 تاريخ البداية: ${subscription.startDate.toLocaleDateString('ar-SA')}`,
-      `📅 تاريخ الانتهاء: ${subscription.endDate.toLocaleDateString('ar-SA')}`,
-      ``,
-      `💳 حالة الدفع: ${paymentText}`,
-      `💰 المبلغ الإجمالي: ${subscription.totalPrice} ${subscription.currency}`,
-      subscription.discount > 0 ? `🎁 الخصم: ${subscription.discount} ${subscription.currency}` : '',
-      ``,
-      `شكراً لثقتكم بنا! 🙏`,
-      ``,
-      `📱 *ملاحظة:*`,
-      `للتسجيل ومتابعة تفاصيل حسابك، يرجى إنشاء حساب على الموقع التالي:`,
-      `https://plutostoreai.lovable.app`,
-    ].filter(Boolean).join('\n');
-
-    try {
-      const response = await supabase.functions.invoke('send-whatsapp', {
-        body: {
-          to: customerWhatsapp,
-          message,
-          customerName: subscription.customerName,
-        },
-      });
-
-      if (response.error) {
-        console.error('WhatsApp notification error:', response.error);
-      } else {
-        console.log('WhatsApp notification sent successfully');
-      }
-    } catch (err) {
-      console.error('Error sending WhatsApp notification:', err);
-    }
+  const sendWhatsAppNotification = async (_subscription: Subscription, _customerWhatsapp: string) => {
+    // Supabase removed: WhatsApp sending disabled.
+    return;
   };
 
   const handleAddSubscription = async (subscriptionData: Omit<Subscription, 'id' | 'status'>) => {
@@ -255,95 +199,6 @@ const Subscriptions = () => {
     const customer = customers.find(c => c.id === subscriptionData.customerId);
     const customerWhatsapp = customer?.whatsapp?.replace(/[^0-9]/g, '') || '';
     
-    // Save to Supabase customer_subscriptions table
-    try {
-      const { data: insertedSubscription, error } = await supabase
-        .from('customer_subscriptions')
-        .insert({
-          customer_id: subscriptionData.customerId,
-          service_name: subscriptionData.services.map(s => s.serviceName).join(', '),
-          price: subscriptionData.totalPrice,
-          currency: subscriptionData.currency,
-          start_date: subscriptionData.startDate.toISOString(),
-          end_date: subscriptionData.endDate.toISOString(),
-          status: 'active',
-          subscription_type: subscriptionData.subscriptionType || null,
-          account_type: subscriptionData.accountType || null,
-          slot_id: subscriptionData.slotId || null,
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('Error saving subscription to database:', error);
-        toast.error('حدث خطأ في حفظ الاشتراك');
-        return;
-      }
-
-      newSubscription = {
-        ...newSubscription,
-        dbId: insertedSubscription?.id || undefined,
-      };
-
-      // For shared subscriptions, fetch slot credentials once and store them locally for the customer portal.
-      if (subscriptionData.subscriptionType === 'shared' && subscriptionData.slotId) {
-        const { data: slotData, error: slotErr } = await supabase
-          .from('service_slots')
-          .select('id, email, password, slot_name, updated_at')
-          .eq('id', subscriptionData.slotId)
-          .maybeSingle();
-
-        if (!slotErr && slotData) {
-          newSubscription = {
-            ...newSubscription,
-            loginEmail: slotData.email || undefined,
-            loginPassword: slotData.password || undefined,
-            loginSlotName: slotData.slot_name || undefined,
-            loginUpdatedAt: slotData.updated_at || undefined,
-          };
-        } else if (slotErr) {
-          console.error('Error fetching slot credentials:', slotErr);
-        }
-      }
-
-      // If payment is deferred, deduct the amount from customer balance (make it negative/debt).
-      // Customer dashboard uses per-currency balances.
-      if (subscriptionData.paymentStatus === 'deferred') {
-        const { data: customerData, error: fetchError } = await supabase
-          .from('customer_accounts')
-          .select('balance, currency, balance_sar, balance_yer, balance_usd')
-          .eq('id', subscriptionData.customerId)
-          .single();
-
-        if (!fetchError && customerData) {
-          const amount = subscriptionData.totalPrice || 0;
-          const currency = subscriptionData.currency || customerData.currency || 'SAR';
-
-          const next: any = {
-            // Keep the legacy single balance field updated too.
-            balance: (customerData.balance || 0) - amount,
-          };
-
-          if (currency === 'SAR') next.balance_sar = (customerData.balance_sar || 0) - amount;
-          if (currency === 'YER') next.balance_yer = (customerData.balance_yer || 0) - amount;
-          if (currency === 'USD') next.balance_usd = (customerData.balance_usd || 0) - amount;
-
-          const { error: updateError } = await supabase
-            .from('customer_accounts')
-            .update(next)
-            .eq('id', subscriptionData.customerId);
-
-          if (updateError) {
-            console.error('Error updating customer balance:', updateError);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      toast.error('حدث خطأ في حفظ الاشتراك');
-      return;
-    }
-
     setSubscriptions([newSubscription, ...subscriptions]);
     
     // Create invoice from subscription
@@ -356,80 +211,11 @@ const Subscriptions = () => {
       addPayment(payment);
     }
     
-    // Send WhatsApp notification to customer
-    if (customerWhatsapp) {
-      sendWhatsAppNotification(newSubscription, customerWhatsapp);
-      toast.success('تمت إضافة الاشتراك وإرسال التفاصيل للعميل عبر واتساب');
-    } else {
-      toast.success('تمت إضافة الاشتراك وإنشاء الفاتورة بنجاح');
-    }
+    toast.success('تمت إضافة الاشتراك وإنشاء الفاتورة بنجاح');
   };
 
   const handleDeleteSubscription = async () => {
     if (selectedSubscription) {
-      // Delete from Supabase first (and any dependent rows).
-      try {
-        const dbId = (selectedSubscription as any).dbId as string | undefined;
-
-        if (dbId) {
-          // Remove renewal requests first to avoid FK issues.
-          await supabase.from('renewal_requests').delete().eq('subscription_id', dbId);
-
-          const { error } = await supabase
-            .from('customer_subscriptions')
-            .delete()
-            .eq('id', dbId);
-
-          if (error) {
-            console.error('Error deleting from Supabase:', error);
-          }
-
-          // Revert deferred balance deduction in customer_accounts.
-          if (selectedSubscription.paymentStatus === 'deferred') {
-            const { data: customerData, error: fetchError } = await supabase
-              .from('customer_accounts')
-              .select('balance, currency, balance_sar, balance_yer, balance_usd')
-              .eq('id', selectedSubscription.customerId)
-              .single();
-
-            if (!fetchError && customerData) {
-              const amount = selectedSubscription.totalPrice || 0;
-              const currency = selectedSubscription.currency || customerData.currency || 'SAR';
-
-              const next: any = {
-                balance: (customerData.balance || 0) + amount,
-              };
-
-              if (currency === 'SAR') next.balance_sar = (customerData.balance_sar || 0) + amount;
-              if (currency === 'YER') next.balance_yer = (customerData.balance_yer || 0) + amount;
-              if (currency === 'USD') next.balance_usd = (customerData.balance_usd || 0) + amount;
-
-              const { error: updateError } = await supabase
-                .from('customer_accounts')
-                .update(next)
-                .eq('id', selectedSubscription.customerId);
-
-              if (updateError) {
-                console.error('Error reverting customer balance:', updateError);
-              }
-            }
-          }
-        } else {
-          // Fallback (older subscriptions without dbId)
-          const { error } = await supabase
-            .from('customer_subscriptions')
-            .delete()
-            .eq('customer_id', selectedSubscription.customerId)
-            .ilike('service_name', `%${selectedSubscription.services[0]?.serviceName || ''}%`);
-
-          if (error) {
-            console.error('Error deleting from Supabase:', error);
-          }
-        }
-      } catch (err) {
-        console.error('Error:', err);
-      }
-
       // Delete associated payment and subtract from balance
       const payments = loadPayments();
       const relatedPayments = payments.filter(p => p.invoiceId === selectedSubscription.id);
