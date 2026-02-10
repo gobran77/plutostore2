@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Calendar, CreditCard, Building2, Wallet, Banknote, Mail, Users } from 'lucide-react';
 import { Customer, SubscriptionService, Subscription, PaymentStatus, SubscriptionPaymentMethod } from '@/types';
 import { Service } from '@/types/services';
@@ -121,6 +121,7 @@ export const AddSubscriptionModal = ({
   const [selectedSharedServiceId, setSelectedSharedServiceId] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const slotsRequestIdRef = useRef(0);
 
   const [subscriptionServices, setSubscriptionServices] = useState<SubscriptionService[]>([
     { id: '1', serviceName: '', price: 0, cost: 0 }
@@ -186,15 +187,20 @@ export const AddSubscriptionModal = ({
 
   // Fetch available slots when shared service is selected
   useEffect(() => {
+    const requestId = ++slotsRequestIdRef.current;
+
+    // Clear the previous service's slots immediately when changing service/type.
+    setAvailableSlots([]);
+    setSelectedSlotId('');
+
     if (formData.subscriptionType === 'shared' && selectedSharedServiceId) {
-      fetchAvailableSlots(selectedSharedServiceId);
+      fetchAvailableSlots(selectedSharedServiceId, requestId);
     } else {
-      setAvailableSlots([]);
-      setSelectedSlotId('');
+      setIsLoadingSlots(false);
     }
   }, [formData.subscriptionType, selectedSharedServiceId]);
 
-  const fetchAvailableSlots = async (serviceId: string) => {
+  const fetchAvailableSlots = async (serviceId: string, requestId: number) => {
     setIsLoadingSlots(true);
     try {
       // Fetch accounts for this service
@@ -207,8 +213,6 @@ export const AddSubscriptionModal = ({
       if (accountsError) throw accountsError;
       
       if (!accountsData || accountsData.length === 0) {
-        setAvailableSlots([]);
-        setIsLoadingSlots(false);
         return;
       }
       
@@ -230,12 +234,17 @@ export const AddSubscriptionModal = ({
           accountName: account?.name || undefined,
         };
       });
-      
+
+      // Ignore stale responses if the user selected another service quickly.
+      if (requestId !== slotsRequestIdRef.current) return;
+
       setAvailableSlots(slots);
     } catch (err) {
       console.error('Error fetching slots:', err);
     } finally {
-      setIsLoadingSlots(false);
+      if (requestId === slotsRequestIdRef.current) {
+        setIsLoadingSlots(false);
+      }
     }
   };
 
@@ -408,6 +417,60 @@ export const AddSubscriptionModal = ({
     }
   };
 
+  const selectedSlot = availableSlots.find(s => s.id === selectedSlotId);
+  const selectedSlotEmail = selectedSlot?.email?.trim() || '';
+  const getLegacyEmailUsage = (email: string) => {
+    try {
+      const raw = localStorage.getItem('app_services');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+
+      const target = email.toLowerCase();
+      const matches: {
+        serviceName: string;
+        accountType: string;
+        subscriberEmail?: string;
+        users: { name: string; email: string; phone?: string; customerId?: string }[];
+      }[] = [];
+
+      for (const svc of parsed) {
+        const serviceName = String(svc?.name || '');
+        const accounts = Array.isArray(svc?.accounts) ? svc.accounts : [];
+        for (const acc of accounts) {
+          const accountType = String(acc?.type || '');
+          const subscriberEmail = acc?.subscriberEmail ? String(acc.subscriberEmail) : undefined;
+
+          // Email as a shared slot in legacy system
+          const sharedEmails = Array.isArray(acc?.sharedEmails) ? acc.sharedEmails : [];
+          for (const se of sharedEmails) {
+            const seEmail = String(se?.email || '').toLowerCase();
+            if (seEmail !== target) continue;
+            const usersRaw = Array.isArray(se?.users) ? se.users : [];
+            const users = usersRaw.map((u: any) => ({
+              name: String(u?.name || ''),
+              email: String(u?.email || ''),
+              phone: u?.phone ? String(u.phone) : undefined,
+              customerId: u?.customerId ? String(u.customerId) : undefined,
+            }));
+            matches.push({ serviceName, accountType, subscriberEmail, users });
+          }
+
+          // Email as a private subscriber in legacy system
+          if (subscriberEmail && subscriberEmail.toLowerCase() === target) {
+            matches.push({ serviceName, accountType, subscriberEmail, users: [] });
+          }
+        }
+      }
+
+      return matches;
+    } catch {
+      return [];
+    }
+  };
+
+  const legacyEmailUsage = selectedSlotEmail ? getLegacyEmailUsage(selectedSlotEmail) : [];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div 
@@ -532,6 +595,7 @@ export const AddSubscriptionModal = ({
                   onChange={(e) => {
                     setSelectedSharedServiceId(e.target.value);
                     setSelectedSlotId('');
+                    setAvailableSlots([]);
                   }}
                   className="input-field"
                 >
@@ -584,6 +648,43 @@ export const AddSubscriptionModal = ({
                           </div>
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Legacy usage (read-only) */}
+                  {selectedSlotEmail && (
+                    <div className="mt-3 p-3 rounded-lg bg-muted/30 border border-border">
+                      <div className="text-sm font-medium text-foreground mb-2">
+                        بيانات الإيميل من صفحة الخدمات (النظام القديم)
+                      </div>
+                      {legacyEmailUsage.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">
+                          لا توجد بيانات مخزنة في النظام القديم لهذا الإيميل.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {legacyEmailUsage.map((m, idx) => (
+                            <div key={idx} className="p-2 rounded-md bg-background border border-border">
+                              <div className="text-sm text-foreground">
+                                <span className="font-medium">{m.serviceName || 'خدمة'}</span>
+                                {m.accountType && (
+                                  <span className="text-muted-foreground"> ({m.accountType})</span>
+                                )}
+                              </div>
+                              {m.subscriberEmail && (
+                                <div className="text-xs text-muted-foreground" dir="ltr">
+                                  subscriber: {m.subscriberEmail}
+                                </div>
+                              )}
+                              {m.users.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  users: {m.users.map(u => u.name).filter(Boolean).join('، ')}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
