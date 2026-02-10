@@ -27,6 +27,7 @@ import { subtractFromBalance } from '@/types/currency';
 
 const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
 const SERVICES_STORAGE_KEY = 'app_services';
+const CUSTOMERS_STORAGE_KEY = 'app_customers';
 const PAYMENT_METHODS_STORAGE_KEY = 'app_payment_methods';
 
 type FilterStatus = 'all' | SubscriptionStatus;
@@ -113,6 +114,9 @@ const Subscriptions = () => {
 
       console.log('Loaded customers for subscriptions:', customerData.length);
       setCustomers(customerData);
+
+      // Cache for other parts of the app (Services page, modals, etc.)
+      localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(customerData));
     } catch (err) {
       console.error('Error loading customers:', err);
     }
@@ -253,7 +257,7 @@ const Subscriptions = () => {
     
     // Save to Supabase customer_subscriptions table
     try {
-      const { error } = await supabase
+      const { data: insertedSubscription, error } = await supabase
         .from('customer_subscriptions')
         .insert({
           customer_id: subscriptionData.customerId,
@@ -263,12 +267,36 @@ const Subscriptions = () => {
           start_date: subscriptionData.startDate.toISOString(),
           end_date: subscriptionData.endDate.toISOString(),
           status: 'active',
-        });
+          subscription_type: subscriptionData.subscriptionType || null,
+          account_type: subscriptionData.accountType || null,
+          slot_id: subscriptionData.slotId || null,
+        })
+        .select('id')
+        .single();
 
       if (error) {
         console.error('Error saving subscription to database:', error);
         toast.error('حدث خطأ في حفظ الاشتراك');
         return;
+      }
+
+      // If shared subscription, assign the selected slot to this customer/subscription.
+      if (subscriptionData.subscriptionType === 'shared' && subscriptionData.slotId) {
+        const { error: slotError } = await supabase
+          .from('service_slots')
+          .update({
+            is_available: false,
+            assigned_customer_id: subscriptionData.customerId,
+            assigned_subscription_id: insertedSubscription?.id || null,
+            assigned_at: new Date().toISOString(),
+            expires_at: subscriptionData.endDate.toISOString(),
+          })
+          .eq('id', subscriptionData.slotId);
+
+        if (slotError) {
+          console.error('Error assigning slot:', slotError);
+          toast.error('Saved subscription, but failed to assign slot.');
+        }
       }
 
       // If payment is deferred, deduct the amount from customer balance (make it negative/debt)

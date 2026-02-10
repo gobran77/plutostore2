@@ -51,6 +51,13 @@ interface Subscription {
   start_date: string;
   end_date: string;
   status: string;
+  slot_id?: string | null;
+  service_slots?: {
+    email: string | null;
+    password: string | null;
+    slot_name: string | null;
+    updated_at: string;
+  } | null;
 }
 
 export default function CustomerDashboard() {
@@ -59,6 +66,7 @@ export default function CustomerDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'home' | 'subscriptions' | 'services' | 'tickets'>('home');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [credentialsUpdated, setCredentialsUpdated] = useState(false);
   const navigate = useNavigate();
 
   // Admin WhatsApp number
@@ -124,7 +132,7 @@ export default function CustomerDashboard() {
     try {
       const { data, error } = await supabase
         .from('customer_subscriptions')
-        .select('*')
+        .select('*, service_slots(email, password, slot_name, updated_at)')
         .eq('customer_id', customerId)
         .order('end_date', { ascending: false });
 
@@ -137,6 +145,33 @@ export default function CustomerDashboard() {
       setIsLoading(false);
     }
   };
+
+  // Listen for credential changes on assigned slots and notify the customer.
+  useEffect(() => {
+    if (!customer?.id) return;
+
+    const channel = supabase
+      .channel(`customer-slot-updates-${customer.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'service_slots',
+          filter: `assigned_customer_id=eq.${customer.id}`,
+        },
+        () => {
+          setCredentialsUpdated(true);
+          toast.error('تم تحديث بيانات الدخول. يرجى تسجيل الدخول من جديد والتواصل مع الادمن لطلب كود التحقق.');
+          fetchSubscriptions(customer.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [customer?.id]);
 
   const handleLogout = () => {
     localStorage.removeItem('customer_session');
@@ -274,6 +309,25 @@ export default function CustomerDashboard() {
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-4 pb-24">
+        {credentialsUpdated && (
+          <Card className="border-0 shadow-md overflow-hidden">
+            <CardContent className="p-4 bg-destructive/10 border border-destructive/20">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
+                <div className="space-y-2">
+                  <p className="font-semibold text-destructive">تم تحديث بيانات الدخول</p>
+                  <p className="text-sm text-muted-foreground">
+                    يرجى تسجيل الدخول من جديد والتواصل مع الادمن لطلب كود التحقق.
+                  </p>
+                  <Button onClick={handleLogout} className="bg-destructive hover:bg-destructive/90">
+                    <LogOut className="w-4 h-4 ml-2" />
+                    تسجيل الخروج
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {/* Multi-Currency Balance Card */}
         <Card className="border-0 shadow-lg overflow-hidden">
           <div className="p-4 bg-gradient-to-br from-primary to-primary/80 text-white">
@@ -509,6 +563,31 @@ export default function CustomerDashboard() {
                             <RefreshCw className="w-4 h-4 ml-2" />
                             تجديد الاشتراك
                           </Button>
+                        </div>
+                      )}
+
+                      {/* Login details (shared slots) */}
+                      {sub.service_slots?.email && (
+                        <div className="pt-3 border-t border-border space-y-2">
+                          <p className="text-sm font-semibold">Login details</p>
+                          <div className="grid grid-cols-1 gap-2 text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Email</span>
+                              <span className="font-mono" dir="ltr">{sub.service_slots.email}</span>
+                            </div>
+                            {sub.service_slots.password && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Password</span>
+                                <span className="font-mono" dir="ltr">{sub.service_slots.password}</span>
+                              </div>
+                            )}
+                            {sub.service_slots.slot_name && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Slot</span>
+                                <span className="font-medium">{sub.service_slots.slot_name}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

@@ -87,6 +87,17 @@ const Customers = () => {
         }));
       
       setCustomers(customerData);
+      // Cache a simplified list in localStorage so other screens can re-use it.
+      const cached: Customer[] = customerData.map((c) => ({
+        id: c.id,
+        name: c.name,
+        email: '',
+        whatsapp: c.whatsapp_number,
+        currency: c.currency || 'SAR',
+        status: c.status,
+        createdAt: new Date(c.created_at),
+      }));
+      localStorage.setItem('app_customers', JSON.stringify(cached));
     } catch (err) {
       console.error('Error fetching customers:', err);
       toast.error('حدث خطأ في تحميل العملاء');

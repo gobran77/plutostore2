@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useServices, DBService } from '@/hooks/useServices';
+import { supabase } from '@/integrations/supabase/client';
 
 // Storage key for services
 const SERVICES_STORAGE_KEY = 'app_services';
@@ -127,6 +128,35 @@ const Services = () => {
         console.error('Error loading customers:', e);
       }
     }
+
+    // Also fetch from DB so the customer list is available everywhere (even if localStorage is empty).
+    // Cache it in localStorage for screens that still rely on it.
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('customer_accounts')
+          .select('*')
+          .eq('is_admin', false)
+          .neq('account_type', 'admin')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+
+        const customerData: Customer[] = (data || []).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          email: '',
+          whatsapp: c.whatsapp_number,
+          status: (c.status as any) || 'active',
+          createdAt: new Date(c.created_at),
+          currency: c.currency || 'SAR',
+        }));
+
+        setCustomers(customerData);
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(customerData));
+      } catch (err) {
+        console.error('Error fetching customers:', err);
+      }
+    })();
 
     // Load payment methods
     const savedPaymentMethods = localStorage.getItem(PAYMENT_METHODS_KEY);

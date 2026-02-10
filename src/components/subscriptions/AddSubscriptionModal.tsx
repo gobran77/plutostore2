@@ -38,6 +38,8 @@ interface AvailableSlot {
   email: string | null;
   slot_name: string | null;
   account_id: string;
+  is_available: boolean;
+  assigned_customer_id?: string | null;
   accountName?: string;
 }
 
@@ -220,9 +222,8 @@ export const AddSubscriptionModal = ({
       const accountIds = accountsData.map(a => a.id);
       const { data: slotsData, error: slotsError } = await supabase
         .from('service_slots')
-        .select('id, email, slot_name, account_id, is_available')
-        .in('account_id', accountIds)
-        .eq('is_available', true);
+        .select('id, email, slot_name, account_id, is_available, assigned_customer_id')
+        .in('account_id', accountIds);
       
       if (slotsError) throw slotsError;
       
@@ -393,28 +394,7 @@ export const AddSubscriptionModal = ({
       slotId: selectedSlotId || undefined,
     });
     
-    // If shared subscription, update the slot status
-    if (formData.subscriptionType === 'shared' && selectedSlotId) {
-      updateSlotAvailability(selectedSlotId, selectedCustomer.id, endDate);
-    }
-    
     onClose();
-  };
-
-  const updateSlotAvailability = async (slotId: string, customerId: string, expiresAt: Date) => {
-    try {
-      await supabase
-        .from('service_slots')
-        .update({
-          is_available: false,
-          assigned_customer_id: customerId,
-          assigned_at: new Date().toISOString(),
-          expires_at: expiresAt.toISOString(),
-        })
-        .eq('id', slotId);
-    } catch (err) {
-      console.error('Error updating slot:', err);
-    }
   };
 
   const selectedSlot = availableSlots.find(s => s.id === selectedSlotId);
@@ -618,6 +598,10 @@ export const AddSubscriptionModal = ({
                     <div className="text-center py-4 text-muted-foreground">
                       جاري تحميل السلوتات المتاحة...
                     </div>
+                  ) : availableSlots.length > 0 && availableSlots.every((s) => !s.is_available) ? (
+                    <div className="text-center py-4 text-warning bg-warning/10 rounded-lg">
+                      No available slots for this service right now (all in use)
+                    </div>
                   ) : availableSlots.length === 0 ? (
                     <div className="text-center py-4 text-warning bg-warning/10 rounded-lg">
                       لا توجد سلوتات متاحة لهذه الخدمة
@@ -629,10 +613,11 @@ export const AddSubscriptionModal = ({
                           key={slot.id}
                           type="button"
                           onClick={() => setSelectedSlotId(slot.id)}
+                          disabled={!slot.is_available}
                           className={`flex items-center gap-3 p-3 rounded-lg border text-sm transition-all text-right ${
                             selectedSlotId === slot.id
                               ? 'bg-primary/10 border-primary text-primary'
-                              : 'border-border hover:border-primary/50'
+                              : slot.is_available ? 'border-border hover:border-primary/50' : 'border-border opacity-60 cursor-not-allowed'
                           }`}
                         >
                           <Mail className="w-4 h-4 shrink-0" />
@@ -644,6 +629,9 @@ export const AddSubscriptionModal = ({
                               <p className="text-xs text-muted-foreground">
                                 {slot.accountName}
                               </p>
+                            )}
+                            {!slot.is_available && (
+                              <p className="text-xs text-warning">مستخدم</p>
                             )}
                           </div>
                         </button>
@@ -718,31 +706,18 @@ export const AddSubscriptionModal = ({
                     {services.length > 0 ? (
                       <select
                         value={service.serviceId || ''}
-                        onChange={(e) => {
-                          if (e.target.value === 'custom') {
-                            updateService(service.id, 'serviceId', undefined as any);
-                            updateService(service.id, 'serviceName', '');
-                          } else {
-                            selectExistingService(service.id, e.target.value);
-                          }
-                        }}
+                        onChange={(e) => selectExistingService(service.id, e.target.value)}
                         className="input-field flex-1"
                       >
                         <option value="">اختر خدمة أو أدخل يدوياً</option>
                         {services.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
-                        <option value="custom">إدخال يدوي</option>
                       </select>
                     ) : (
-                      <input
-                        type="text"
-                        placeholder="اسم الخدمة"
-                        value={service.serviceName}
-                        onChange={(e) => updateService(service.id, 'serviceName', e.target.value)}
-                        className="input-field flex-1"
-                        required
-                      />
+                      <div className="flex-1 text-sm text-muted-foreground">
+                        No services found. Add services in the Services page first.
+                      </div>
                     )}
                     
                     <button
@@ -755,15 +730,7 @@ export const AddSubscriptionModal = ({
                     </button>
                   </div>
                   
-                  {(!service.serviceId || service.serviceId === '') && services.length > 0 && (
-                    <input
-                      type="text"
-                      placeholder="اسم الخدمة (إدخال يدوي)"
-                      value={service.serviceName}
-                      onChange={(e) => updateService(service.id, 'serviceName', e.target.value)}
-                      className="input-field w-full mr-8"
-                    />
-                  )}
+                  {/* Manual service entry removed: services must be selected from the Services page. */}
                   
                   <div className="flex items-center gap-4 mr-8">
                     <div className="flex items-center gap-1 flex-1">
