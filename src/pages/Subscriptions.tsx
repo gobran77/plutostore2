@@ -280,21 +280,31 @@ const Subscriptions = () => {
         return;
       }
 
-      // If payment is deferred, deduct the amount from customer balance (make it negative/debt)
+      // If payment is deferred, deduct the amount from customer balance (make it negative/debt).
+      // Customer dashboard uses per-currency balances.
       if (subscriptionData.paymentStatus === 'deferred') {
         const { data: customerData, error: fetchError } = await supabase
           .from('customer_accounts')
-          .select('balance')
+          .select('balance, currency, balance_sar, balance_yer, balance_usd')
           .eq('id', subscriptionData.customerId)
           .single();
 
         if (!fetchError && customerData) {
-          const currentBalance = customerData.balance || 0;
-          const newBalance = currentBalance - subscriptionData.totalPrice;
+          const amount = subscriptionData.totalPrice || 0;
+          const currency = subscriptionData.currency || customerData.currency || 'SAR';
+
+          const next: any = {
+            // Keep the legacy single balance field updated too.
+            balance: (customerData.balance || 0) - amount,
+          };
+
+          if (currency === 'SAR') next.balance_sar = (customerData.balance_sar || 0) - amount;
+          if (currency === 'YER') next.balance_yer = (customerData.balance_yer || 0) - amount;
+          if (currency === 'USD') next.balance_usd = (customerData.balance_usd || 0) - amount;
 
           const { error: updateError } = await supabase
             .from('customer_accounts')
-            .update({ balance: newBalance })
+            .update(next)
             .eq('id', subscriptionData.customerId);
 
           if (updateError) {

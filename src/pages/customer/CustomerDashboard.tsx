@@ -47,7 +47,10 @@ interface Subscription {
   service_name: string;
   price: number;
   currency: string;
-  payment_status?: string;
+  payment_status?: string | null;
+  paid_amount?: number | null;
+  due_date?: string | null;
+  payment_notes?: string | null;
   start_date: string;
   end_date: string;
   status: string;
@@ -72,6 +75,47 @@ export default function CustomerDashboard() {
 
   // Admin WhatsApp number
   const adminWhatsApp = '201030638992';
+  const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
+
+  const loadLocalSubscriptionsForCustomer = (customerId: string): Subscription[] => {
+    try {
+      const raw = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+
+      return parsed
+        .filter((s: any) => String(s?.customerId || '') === customerId)
+        .map((s: any) => {
+          const start = s?.startDate ? new Date(s.startDate) : (s?.start_date ? new Date(s.start_date) : new Date());
+          const end = s?.endDate ? new Date(s.endDate) : (s?.end_date ? new Date(s.end_date) : new Date());
+          const due = s?.dueDate ? new Date(s.dueDate) : (s?.due_date ? new Date(s.due_date) : null);
+
+          const services = Array.isArray(s?.services) ? s.services : [];
+          const serviceName = services.length > 0
+            ? services.map((x: any) => String(x?.serviceName || '')).filter(Boolean).join(', ')
+            : String(s?.service_name || s?.serviceName || '');
+
+          return {
+            id: String(s?.id || `${Date.now()}`),
+            service_name: serviceName || 'خدمة',
+            price: Number(s?.totalPrice ?? s?.price ?? 0),
+            currency: String(s?.currency || 'SAR'),
+            payment_status: s?.paymentStatus ? String(s.paymentStatus) : (s?.payment_status ? String(s.payment_status) : null),
+            paid_amount: typeof s?.paidAmount === 'number' ? s.paidAmount : (typeof s?.paid_amount === 'number' ? s.paid_amount : null),
+            due_date: due ? due.toISOString() : null,
+            payment_notes: s?.paymentNotes ? String(s.paymentNotes) : (s?.payment_notes ? String(s.payment_notes) : null),
+            start_date: start.toISOString(),
+            end_date: end.toISOString(),
+            status: String(s?.status || 'active'),
+            slot_id: s?.slotId ? String(s.slotId) : (s?.slot_id ? String(s.slot_id) : null),
+          } as Subscription;
+        });
+    } catch (e) {
+      console.error('Error loading local subscriptions:', e);
+      return [];
+    }
+  };
 
   useEffect(() => {
     // Check for admin session first
@@ -138,10 +182,40 @@ export default function CustomerDashboard() {
         .order('end_date', { ascending: false });
 
       if (error) throw error;
-      setSubscriptions(data || []);
+
+      const dbSubs = (data || []) as Subscription[];
+      if (dbSubs.length > 0) {
+        setSubscriptions(dbSubs);
+        return;
+      }
+
+      // Fallback for environments where customer_subscriptions has limited fields or is empty:
+      // use localStorage subscriptions created by the admin in this browser.
+      const localSubs = loadLocalSubscriptionsForCustomer(customerId);
+
+      // Attach slot credentials for shared subscriptions.
+      const slotIds = Array.from(new Set(localSubs.map((s) => s.slot_id).filter((v): v is string => typeof v === 'string' && v.length > 0)));
+      if (slotIds.length > 0) {
+        const { data: slotsData } = await supabase
+          .from('service_slots')
+          .select('id, email, password, slot_name, updated_at')
+          .in('id', slotIds);
+
+        const byId = new Map<string, any>((slotsData || []).map((x: any) => [String(x.id), x]));
+        const withSlots = localSubs.map((s) => {
+          const slot = s.slot_id ? byId.get(String(s.slot_id)) : null;
+          return slot ? { ...s, service_slots: slot } : s;
+        });
+        setSubscriptions(withSlots);
+      } else {
+        setSubscriptions(localSubs);
+      }
     } catch (err) {
       console.error('Error fetching subscriptions:', err);
       toast.error('حدث خطأ في تحميل الاشتراكات');
+
+      // Last-resort fallback to localStorage.
+      setSubscriptions(loadLocalSubscriptionsForCustomer(customerId));
     } finally {
       setIsLoading(false);
     }
@@ -473,6 +547,61 @@ export default function CustomerDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Deferred/Partial Payment Alert */}
+        {(() => {
+          const dueSubs = subscriptions
+            .filter((s) => (s.payment_status === 'deferred' || s.payment_status === 'partial'))
+            .map((s) => {
+              const paid = typeof s.paid_amount === 'number' ? s.paid_amount : 0;
+              const remaining = Math.max(0, Number(s.price || 0) - paid);
+              const due = s.due_date ? new Date(s.due_date) : null;
+              const daysLeft = due ? differenceInDays(new Date(due), new Date()) : null;
+              return { s, remaining, due, daysLeft };
+            })
+            .filter((x) => x.remaining > 0);
+
+          if (dueSubs.length === 0) return null;
+
+          const top = dueSubs[0];
+          return (
+            <Card className="border-0 shadow-md overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="w-5 h-5" />
+                  يرجى سداد القيمة
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">الخدمة: </span>
+                  <span className="font-medium">{top.s.service_name}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">المتبقي: </span>
+                  <span className="font-bold text-destructive">
+                    {top.remaining} {top.s.currency}
+                  </span>
+                </div>
+                {top.due && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">تاريخ الاستحقاق: </span>
+                    <span className="font-medium">{format(top.due, 'dd MMM yyyy', { locale: ar })}</span>
+                    {typeof top.daysLeft === 'number' && (
+                      <span className="text-muted-foreground"> ({top.daysLeft >= 0 ? `متبقي ${top.daysLeft} يوم` : `متأخر ${Math.abs(top.daysLeft)} يوم`})</span>
+                    )}
+                  </div>
+                )}
+                {top.s.payment_notes && top.s.payment_notes.trim().length > 0 && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">ملاحظة: </span>
+                    <span className="font-medium">{top.s.payment_notes}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Days Remaining Alert */}
         {subscriptions.length > 0 && (
