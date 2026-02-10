@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Zap, Phone, Lock, Eye, EyeOff, User, Copy, CheckCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { CUSTOMER_ACCOUNTS_KEY, LocalCustomerAccount } from '@/hooks/useCustomerPassword';
 
 // Generate random 6-digit activation code
 const generateActivationCode = () => {
@@ -46,14 +46,18 @@ export default function CustomerRegister() {
     setIsLoading(true);
 
     try {
-      // Check if phone number already exists
-      const { data: existingCustomer } = await supabase
-        .from('customer_accounts')
-        .select('id')
-        .eq('whatsapp_number', whatsappNumber.trim())
-        .single();
+      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
+      const accounts: LocalCustomerAccount[] = (() => {
+        try {
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
 
-      if (existingCustomer) {
+      const exists = accounts.some((a) => String(a.whatsapp_number || '').trim() === whatsappNumber.trim());
+      if (exists) {
         toast.error('رقم الواتساب مسجل مسبقاً');
         setIsLoading(false);
         return;
@@ -62,21 +66,21 @@ export default function CustomerRegister() {
       // Generate activation code
       const code = generateActivationCode();
 
-      // Create customer account
-      const { error } = await supabase
-        .from('customer_accounts')
-        .insert({
-          name: name.trim(),
-          whatsapp_number: whatsappNumber.trim(),
-          password_hash: password,
-          activation_code: code,
-          is_activated: false,
-          account_type: 'customer',
-          balance: 0,
-          currency: 'SAR',
-        });
-
-      if (error) throw error;
+      accounts.unshift({
+        id: `cust_${Date.now()}`,
+        name: name.trim(),
+        whatsapp_number: whatsappNumber.trim(),
+        password_hash: password,
+        activation_code: code,
+        is_activated: false,
+        account_type: 'customer',
+        balance: 0,
+        currency: 'SAR',
+        balance_sar: 0,
+        balance_yer: 0,
+        balance_usd: 0,
+      });
+      localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
 
       setActivationCode(code);
       setRegistrationComplete(true);

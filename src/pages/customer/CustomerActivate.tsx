@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Zap, KeyRound, CheckCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { CUSTOMER_ACCOUNTS_KEY, LocalCustomerAccount } from '@/hooks/useCustomerPassword';
 
 export default function CustomerActivate() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
@@ -26,33 +26,36 @@ export default function CustomerActivate() {
     setIsLoading(true);
 
     try {
-      // Find customer by WhatsApp number and activation code
-      const { data: customer, error } = await supabase
-        .from('customer_accounts')
-        .select('*')
-        .eq('whatsapp_number', whatsappNumber.trim())
-        .eq('activation_code', activationCode.trim())
-        .single();
+      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
+      const accounts: LocalCustomerAccount[] = (() => {
+        try {
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
 
-      if (error || !customer) {
+      const idx = accounts.findIndex(
+        (a) =>
+          String(a.whatsapp_number || '').trim() === whatsappNumber.trim() &&
+          String(a.activation_code || '').trim() === activationCode.trim()
+      );
+
+      if (idx === -1) {
         toast.error('الكود غير صحيح أو رقم الواتساب غير مسجل');
         setIsLoading(false);
         return;
       }
 
-      if ((customer as any).is_activated) {
+      if ((accounts[idx] as any).is_activated) {
         toast.info('الحساب مفعل مسبقاً');
         navigate('/customer');
         return;
       }
 
-      // Activate the account
-      const { error: updateError } = await supabase
-        .from('customer_accounts')
-        .update({ is_activated: true })
-        .eq('id', customer.id);
-
-      if (updateError) throw updateError;
+      accounts[idx] = { ...accounts[idx], is_activated: true };
+      localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
 
       setActivationComplete(true);
       toast.success('تم تفعيل الحساب بنجاح!');
