@@ -561,7 +561,6 @@ export const AddSubscriptionModal = ({
           {formData.subscriptionType === 'shared' && (
             <div className="space-y-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
               <div className="flex items-center gap-2 text-primary">
-                <Users className="w-5 h-5" />
                 <span className="font-medium">اختيار الخدمة المشتركة</span>
               </div>
               
