@@ -5,11 +5,9 @@ import { DataTable } from '@/components/common/DataTable';
 import { ActionsMenu } from '@/components/common/ActionsMenu';
 import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
 import { AddServiceModal } from '@/components/services/AddServiceModal';
-import { AddDBServiceModal } from '@/components/services/AddDBServiceModal';
-import { EditDBServiceModal } from '@/components/services/EditDBServiceModal';
 import { AddUserToServiceModal } from '@/components/services/AddUserToServiceModal';
 import { AddDynamicServiceModal } from '@/components/services/dynamic';
-import { Plus, Edit, Trash2, Eye, Package, Users, User, Mail, X, ChevronRight, ArrowRight, Zap, Settings2, ToggleLeft, ToggleRight, Database, KeyRound } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Package, Users, User, Mail, X, ChevronRight, ArrowRight, Zap, Settings2, ToggleLeft, ToggleRight, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Customer } from '@/types';
 import { Service, ServiceAccount, ServiceEmail, ServiceUser, ServiceType } from '@/types/services';
@@ -18,8 +16,6 @@ import { getCurrencySymbol } from '@/types/currency';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useServices, DBService } from '@/hooks/useServices';
-import { supabase } from '@/integrations/supabase/client';
 
 // Storage key for services
 const SERVICES_STORAGE_KEY = 'app_services';
@@ -35,26 +31,11 @@ const Services = () => {
   const [selectedAccount, setSelectedAccount] = useState<ServiceAccount | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<ServiceEmail | null>(null);
   
-  // DB Services hook
-  const { 
-    services: dbServices, 
-    isLoading: dbServicesLoading, 
-    addService: addDBService, 
-    updateService: updateDBService,
-    deleteService: deleteDBService,
-    toggleServiceStatus: toggleDBServiceStatus 
-  } = useServices();
-  
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'customer' | 'legacy' | 'dynamic'>('customer');
-  
-  // Edit service modal
-  const [editingDBService, setEditingDBService] = useState<DBService | null>(null);
-  const [isEditDBServiceModalOpen, setIsEditDBServiceModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'legacy' | 'dynamic'>('legacy');
   
   // Modals
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
-  const [isAddDBServiceModalOpen, setIsAddDBServiceModalOpen] = useState(false);
   const [isAddDynamicServiceModalOpen, setIsAddDynamicServiceModalOpen] = useState(false);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isAddEmailModalOpen, setIsAddEmailModalOpen] = useState(false);
@@ -62,7 +43,7 @@ const Services = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'service' | 'account' | 'email' | 'dynamic' | 'dbService'; id: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'service' | 'account' | 'email' | 'dynamic'; id: string; name: string } | null>(null);
   const [editingDynamicService, setEditingDynamicService] = useState<DynamicService | undefined>();
 
   // View state
@@ -131,34 +112,7 @@ const Services = () => {
       }
     }
 
-    // Also fetch from DB so the customer list is available everywhere (even if localStorage is empty).
-    // Cache it in localStorage for screens that still rely on it.
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('customer_accounts')
-          .select('*')
-          .eq('is_admin', false)
-          .neq('account_type', 'admin')
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-
-        const customerData: Customer[] = (data || []).map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          email: '',
-          whatsapp: c.whatsapp_number,
-          status: (c.status as any) || 'active',
-          createdAt: new Date(c.created_at),
-          currency: c.currency || 'SAR',
-        }));
-
-        setCustomers(customerData);
-        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(customerData));
-      } catch (err) {
-        console.error('Error fetching customers:', err);
-      }
-    })();
+    // Supabase removed: customers are loaded from localStorage only.
 
     // Load payment methods
     const savedPaymentMethods = localStorage.getItem(PAYMENT_METHODS_KEY);
@@ -299,131 +253,12 @@ const Services = () => {
     toast.success('تمت إضافة الإيميل بنجاح');
   };
 
-  const syncSharedEmailCredentialsToSupabase = async (params: {
-    serviceName: string;
-    oldEmail: string;
-    newEmail: string;
-    newPassword: string;
-  }) => {
-    const { serviceName, oldEmail, newEmail, newPassword } = params;
-    try {
-      // 1) Ensure service exists (by name)
-      const { data: existingSvc, error: svcErr } = await supabase
-        .from('services')
-        .select('id')
-        .eq('name', serviceName)
-        .maybeSingle();
-
-      if (svcErr) throw svcErr;
-
-      let serviceId = existingSvc?.id as string | undefined;
-      if (!serviceId) {
-        const { data: inserted, error: insErr } = await supabase
-          .from('services')
-          .insert({
-            name: serviceName,
-            description: null,
-            default_type: 'shared',
-            is_active: true,
-            pricing: [],
-          })
-          .select('id')
-          .single();
-
-        if (insErr) throw insErr;
-        serviceId = inserted.id;
-      }
-
-      // 2) Ensure shared account exists
-      const { data: accounts, error: accErr } = await supabase
-        .from('service_accounts')
-        .select('id')
-        .eq('service_id', serviceId)
-        .eq('account_type', 'shared');
-
-      if (accErr) throw accErr;
-
-      let accountId = accounts?.[0]?.id as string | undefined;
-      if (!accountId) {
-        const { data: insertedAcc, error: insAccErr } = await supabase
-          .from('service_accounts')
-          .insert({
-            service_id: serviceId,
-            account_type: 'shared',
-            name: 'shared',
-          })
-          .select('id')
-          .single();
-
-        if (insAccErr) throw insAccErr;
-        accountId = insertedAcc.id;
-      }
-
-      // 3) Update the matching slot (prefer old email; fallback to new email)
-      const { data: existingSlot, error: slotErr } = await supabase
-        .from('service_slots')
-        .select('id')
-        .eq('account_id', accountId)
-        .eq('email', oldEmail)
-        .maybeSingle();
-
-      if (slotErr) throw slotErr;
-
-      const doUpdate = async (slotId: string) => {
-        const { error: updErr } = await supabase
-          .from('service_slots')
-          .update({
-            email: newEmail,
-            password: newPassword || null,
-          })
-          .eq('id', slotId);
-
-        if (updErr) throw updErr;
-      };
-
-      if (existingSlot?.id) {
-        await doUpdate(existingSlot.id);
-        return;
-      }
-
-      const { data: existingSlot2, error: slotErr2 } = await supabase
-        .from('service_slots')
-        .select('id')
-        .eq('account_id', accountId)
-        .eq('email', newEmail)
-        .maybeSingle();
-
-      if (slotErr2) throw slotErr2;
-
-      if (existingSlot2?.id) {
-        await doUpdate(existingSlot2.id);
-        return;
-      }
-
-      // If not found, insert a new one.
-      const { error: insSlotErr } = await supabase.from('service_slots').insert({
-        account_id: accountId,
-        email: newEmail,
-        password: newPassword || null,
-        slot_name: null,
-        is_available: true,
-      });
-
-      if (insSlotErr) throw insSlotErr;
-    } catch (err) {
-      console.error('Error syncing shared email credentials to Supabase:', err);
-      toast.error('تم تحديث البيانات محلياً لكن فشل تحديثها في قاعدة البيانات');
-    }
-  };
-
   const handleUpdateEmailCredentials = async () => {
     if (!selectedService || !selectedAccount || !selectedEmail) return;
     if (!editEmailForm.email.trim()) {
       toast.error('يرجى إدخال الإيميل');
       return;
     }
-
-    const oldEmail = selectedEmail.email;
     const updated: ServiceEmail = {
       ...selectedEmail,
       email: editEmailForm.email.trim(),
@@ -458,14 +293,6 @@ const Services = () => {
 
     setIsEditEmailModalOpen(false);
     toast.success('تم تحديث بيانات الدخول');
-
-    // Push update to Supabase so customers see it instantly (realtime service_slots update).
-    await syncSharedEmailCredentialsToSupabase({
-      serviceName: selectedService.name,
-      oldEmail,
-      newEmail: updated.email,
-      newPassword: updated.password,
-    });
   };
 
   // User CRUD
@@ -556,9 +383,7 @@ const Services = () => {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     
-    if (deleteTarget.type === 'dbService') {
-      await deleteDBService(deleteTarget.id);
-    } else if (deleteTarget.type === 'dynamic') {
+    if (deleteTarget.type === 'dynamic') {
       setDynamicServices(dynamicServices.filter(s => s.id !== deleteTarget.id));
       toast.success('تم حذف الخدمة بنجاح');
     } else if (deleteTarget.type === 'service') {
@@ -1046,12 +871,12 @@ const Services = () => {
         }
         subtitle={
           viewMode === 'services' 
-            ? `${dynamicServices.length + services.length + dbServices.length} خدمة` 
+            ? `${dynamicServices.length + services.length} خدمة` 
             : viewMode === 'accounts' 
             ? `${selectedService?.accounts.length || 0} حساب` 
             : `${selectedAccount?.sharedEmails.length || 0} إيميل`
         }
-        showAddButton={viewMode !== 'services' || activeTab === 'legacy' || activeTab === 'customer'}
+        showAddButton={viewMode !== 'services' || activeTab === 'legacy'}
         addButtonLabel={
           viewMode === 'services' ? 'إضافة خدمة' :
           viewMode === 'accounts' ? 'إضافة حساب' :
@@ -1059,9 +884,7 @@ const Services = () => {
         }
         onAddClick={() => {
           if (viewMode === 'services') {
-            if (activeTab === 'customer') {
-              setIsAddDBServiceModalOpen(true);
-            } else if (activeTab === 'legacy') {
+            if (activeTab === 'legacy') {
               setIsAddServiceModalOpen(true);
             }
           } else if (viewMode === 'accounts') {
@@ -1081,12 +904,8 @@ const Services = () => {
 
       <div className="p-6 space-y-6 animate-fade-in">
         {viewMode === 'services' && (
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'customer' | 'legacy' | 'dynamic')}>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'legacy' | 'dynamic')}>
             <TabsList className="mb-4">
-              <TabsTrigger value="customer" className="gap-2">
-                <Database className="w-4 h-4" />
-                خدمات العملاء
-              </TabsTrigger>
               <TabsTrigger value="dynamic" className="gap-2">
                 <Zap className="w-4 h-4" />
                 الخدمات الديناميكية
@@ -1096,108 +915,6 @@ const Services = () => {
                 الاشتراكات (النظام القديم)
               </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="customer" className="mt-0">
-              {dbServicesLoading ? (
-                <div className="text-center py-16 bg-card rounded-xl border border-border">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">جاري تحميل الخدمات...</p>
-                </div>
-              ) : dbServices.length === 0 ? (
-                <div className="text-center py-16 bg-card rounded-xl border border-border">
-                  <Database className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">لا توجد خدمات للعملاء</h3>
-                  <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                    أضف خدمات ليتمكن العملاء من تصفحها ومعرفة الأسعار
-                  </p>
-                  <Button onClick={() => setIsAddDBServiceModalOpen(true)}>
-                    <Plus className="w-4 h-4 ml-2" />
-                    إضافة خدمة
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {dbServices.map((service) => {
-                    const activePricing = service.pricing.filter(p => p.sellPrice > 0);
-                    return (
-                      <div key={service.id} className="bg-card rounded-xl border border-border p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                              service.is_active ? 'bg-primary/10' : 'bg-muted'
-                            }`}>
-                              <Package className={`w-6 h-6 ${service.is_active ? 'text-primary' : 'text-muted-foreground'}`} />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-foreground">{service.name}</h3>
-                                <Badge variant={service.is_active ? 'default' : 'secondary'}>
-                                  {service.is_active ? 'نشطة' : 'متوقفة'}
-                                </Badge>
-                                <Badge variant={service.default_type === 'shared' ? 'outline' : 'secondary'}>
-                                  {service.default_type === 'shared' ? 'مشترك' : 'خاص'}
-                                </Badge>
-                              </div>
-                              {service.description && (
-                                <p className="text-sm text-muted-foreground">{service.description}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setEditingDBService(service);
-                                setIsEditDBServiceModalOpen(true);
-                              }}
-                              className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors"
-                              title="تعديل الخدمة"
-                            >
-                              <Edit className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => toggleDBServiceStatus(service.id)}
-                              className={`p-2 rounded-lg transition-colors ${
-                                service.is_active 
-                                  ? 'hover:bg-muted text-success' 
-                                  : 'hover:bg-muted text-muted-foreground'
-                              }`}
-                              title={service.is_active ? 'إيقاف الخدمة' : 'تفعيل الخدمة'}
-                            >
-                              {service.is_active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeleteTarget({ type: 'dbService', id: service.id, name: service.name });
-                                setIsDeleteModalOpen(true);
-                              }}
-                              className="p-2 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
-                              title="حذف الخدمة"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </div>
-                        {activePricing.length > 0 && (
-                          <div className="mt-4 pt-4 border-t border-border">
-                            <p className="text-sm font-medium text-muted-foreground mb-2">التسعير:</p>
-                            <div className="flex flex-wrap gap-2">
-                              {activePricing.map((p, idx) => (
-                                <div key={idx} className="bg-muted/50 px-3 py-1.5 rounded-lg text-sm">
-                                  <span className="font-medium">{p.periodName}:</span>{' '}
-                                  <span className="text-primary font-bold">{p.sellPrice}</span>{' '}
-                                  <span className="text-muted-foreground">{getCurrencySymbol(p.currency)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </TabsContent>
-
 
             <TabsContent value="dynamic" className="mt-0">
               {dynamicServices.length === 0 ? (
@@ -1303,17 +1020,6 @@ const Services = () => {
         onSave={handleAddDynamicService}
         existingService={editingDynamicService}
         paymentMethods={paymentMethods}
-      />
-
-      {/* Edit DB Service Modal */}
-      <EditDBServiceModal
-        isOpen={isEditDBServiceModalOpen}
-        onClose={() => {
-          setIsEditDBServiceModalOpen(false);
-          setEditingDBService(null);
-        }}
-        onSave={updateDBService}
-        service={editingDBService}
       />
 
       {/* Add Account Modal */}
@@ -1559,17 +1265,10 @@ const Services = () => {
         customers={customers}
       />
 
-      {/* Add DB Service Modal */}
-      <AddDBServiceModal
-        isOpen={isAddDBServiceModalOpen}
-        onClose={() => setIsAddDBServiceModalOpen(false)}
-        onAdd={addDBService}
-      />
-
       {/* Delete Modal */}
       <DeleteConfirmModal
         isOpen={isDeleteModalOpen}
-        title={`حذف ${deleteTarget?.type === 'service' || deleteTarget?.type === 'dynamic' || deleteTarget?.type === 'dbService' ? 'الخدمة' : deleteTarget?.type === 'account' ? 'الحساب' : 'الإيميل'}`}
+        title={`حذف ${deleteTarget?.type === 'service' || deleteTarget?.type === 'dynamic' ? 'الخدمة' : deleteTarget?.type === 'account' ? 'الحساب' : 'الإيميل'}`}
         message="هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء."
         onConfirm={handleDelete}
         onClose={() => { setIsDeleteModalOpen(false); setDeleteTarget(null); }}
