@@ -280,25 +280,6 @@ const Subscriptions = () => {
         return;
       }
 
-      // If shared subscription, assign the selected slot to this customer/subscription.
-      if (subscriptionData.subscriptionType === 'shared' && subscriptionData.slotId) {
-        const { error: slotError } = await supabase
-          .from('service_slots')
-          .update({
-            is_available: false,
-            assigned_customer_id: subscriptionData.customerId,
-            assigned_subscription_id: insertedSubscription?.id || null,
-            assigned_at: new Date().toISOString(),
-            expires_at: subscriptionData.endDate.toISOString(),
-          })
-          .eq('id', subscriptionData.slotId);
-
-        if (slotError) {
-          console.error('Error assigning slot:', slotError);
-          toast.error('Saved subscription, but failed to assign slot.');
-        }
-      }
-
       // If payment is deferred, deduct the amount from customer balance (make it negative/debt)
       if (subscriptionData.paymentStatus === 'deferred') {
         const { data: customerData, error: fetchError } = await supabase

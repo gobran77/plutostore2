@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,6 +67,7 @@ export default function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState<'home' | 'subscriptions' | 'services' | 'tickets'>('home');
   const [isAdmin, setIsAdmin] = useState(false);
   const [credentialsUpdated, setCredentialsUpdated] = useState(false);
+  const slotIdsRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
 
   // Admin WhatsApp number
@@ -146,6 +147,14 @@ export default function CustomerDashboard() {
     }
   };
 
+  useEffect(() => {
+    slotIdsRef.current = new Set(
+      subscriptions
+        .map((s) => s.slot_id)
+        .filter((v): v is string => typeof v === 'string' && v.length > 0)
+    );
+  }, [subscriptions]);
+
   // Listen for credential changes on assigned slots and notify the customer.
   useEffect(() => {
     if (!customer?.id) return;
@@ -158,9 +167,11 @@ export default function CustomerDashboard() {
           event: 'UPDATE',
           schema: 'public',
           table: 'service_slots',
-          filter: `assigned_customer_id=eq.${customer.id}`,
         },
-        () => {
+        (payload: any) => {
+          const updatedId = payload?.new?.id as string | undefined;
+          if (!updatedId || !slotIdsRef.current.has(updatedId)) return;
+
           setCredentialsUpdated(true);
           toast.error('تم تحديث بيانات الدخول. يرجى تسجيل الدخول من جديد والتواصل مع الادمن لطلب كود التحقق.');
           fetchSubscriptions(customer.id);
