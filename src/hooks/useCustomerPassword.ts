@@ -7,6 +7,7 @@ export const CUSTOMER_ACCOUNTS_KEY = 'app_customer_accounts';
 export type LocalCustomerAccount = {
   id: string;
   name: string;
+  email?: string;
   whatsapp_number: string;
   password_hash: string;
   activation_code: string;

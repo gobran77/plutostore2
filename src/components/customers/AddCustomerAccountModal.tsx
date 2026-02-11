@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { CUSTOMER_ACCOUNTS_KEY } from '@/hooks/useCustomerPassword';
+import {
+  createCustomerAccountRecord,
+  getCustomerAccounts,
+  type CustomerAccountRecord,
+} from '@/lib/customerAccountsStorage';
 
 const countries = [
   { name: 'السعودية', code: 'SA', phoneCode: '+966' },
@@ -35,6 +39,7 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    email: '',
     phone: '',
     countryCode: '+966',
     password: '',
@@ -43,21 +48,6 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
 
   const generateActivationCode = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
-  };
-
-  const loadAccounts = (): any[] => {
-    try {
-      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const saveAccounts = (accounts: any[]) => {
-    localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,6 +64,11 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
       return;
     }
 
+    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      toast.error('صيغة البريد الإلكتروني غير صحيحة');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -81,7 +76,7 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
       const activationCode = generateActivationCode();
 
       // Check if phone number already exists (local storage)
-      const accounts = loadAccounts();
+      const accounts = await getCustomerAccounts();
       const existing = accounts.find((a) => String(a?.whatsapp_number || '').trim() === String(fullWhatsappNumber).trim());
       if (existing) {
         toast.error('رقم الهاتف مسجل مسبقاً');
@@ -89,10 +84,23 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
         return;
       }
 
+      const emailValue = formData.email.trim().toLowerCase();
+      if (emailValue) {
+        const emailExists = accounts.find(
+          (a) => String((a as any)?.email || '').trim().toLowerCase() === emailValue
+        );
+        if (emailExists) {
+          toast.error('Email already registered');
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const now = new Date().toISOString();
-      accounts.unshift({
+      const newCustomer: CustomerAccountRecord = {
         id: `cust_${Date.now()}`,
         name: formData.name.trim(),
+        email: emailValue,
         whatsapp_number: fullWhatsappNumber,
         password_hash: formData.password,
         currency: formData.currency,
@@ -106,12 +114,13 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
         balance_sar: 0,
         balance_yer: 0,
         balance_usd: 0,
-      });
-      saveAccounts(accounts);
+      };
+      await createCustomerAccountRecord(newCustomer);
 
       toast.success('تم إنشاء حساب العميل بنجاح');
       setFormData({
         name: '',
+        email: '',
         phone: '',
         countryCode: '+966',
         password: '',
@@ -159,6 +168,20 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="أدخل اسم العميل"
               className="input-field"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              البريد الإلكتروني
+            </label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="customer@example.com"
+              className="input-field"
+              dir="ltr"
             />
           </div>
 

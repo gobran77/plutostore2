@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Zap, KeyRound, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { CUSTOMER_ACCOUNTS_KEY, LocalCustomerAccount } from '@/hooks/useCustomerPassword';
+import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 
 export default function CustomerActivate() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
@@ -26,15 +26,7 @@ export default function CustomerActivate() {
     setIsLoading(true);
 
     try {
-      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
-      const accounts: LocalCustomerAccount[] = (() => {
-        try {
-          const parsed = raw ? JSON.parse(raw) : [];
-          return Array.isArray(parsed) ? parsed : [];
-        } catch {
-          return [];
-        }
-      })();
+      const accounts = await getCustomerAccounts();
 
       const idx = accounts.findIndex(
         (a) =>
@@ -54,8 +46,7 @@ export default function CustomerActivate() {
         return;
       }
 
-      accounts[idx] = { ...accounts[idx], is_activated: true };
-      localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
+      await updateCustomerAccountRecord(accounts[idx].id, { is_activated: true, status: 'active' });
 
       setActivationComplete(true);
       toast.success('تم تفعيل الحساب بنجاح!');

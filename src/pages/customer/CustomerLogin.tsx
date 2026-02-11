@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Zap, Phone, Lock, Eye, EyeOff, KeyRound, ArrowRight, Tag } from 'lucide-react';
 import { ServicesPricingModal } from '@/components/customer/ServicesPricingModal';
+import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
+import { sendActivationOtpEmail } from '@/lib/otpEmail';
 import { toast } from 'sonner';
 
 interface PendingCustomer {
@@ -17,33 +19,39 @@ interface PendingCustomer {
   activation_code: string;
 }
 
-const CUSTOMER_ACCOUNTS_KEY = 'app_customer_accounts';
+const normalizeDigits = (value: string): string => {
+  const arabicIndic = '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669';
+  const easternArabicIndic = '\u06F0\u06F1\u06F2\u06F3\u06F4\u06F5\u06F6\u06F7\u06F8\u06F9';
 
-type LocalCustomerAccount = {
-  id: string;
-  name: string;
-  whatsapp_number: string;
-  password_hash: string;
-  activation_code: string;
-  is_activated: boolean;
-  is_admin?: boolean;
-  account_type?: string;
-  balance?: number;
-  currency?: string;
-  balance_sar?: number;
-  balance_yer?: number;
-  balance_usd?: number;
+  return String(value ?? '')
+    .split('')
+    .map((ch) => {
+      const idxArabic = arabicIndic.indexOf(ch);
+      if (idxArabic !== -1) return String(idxArabic);
+
+      const idxEastern = easternArabicIndic.indexOf(ch);
+      if (idxEastern !== -1) return String(idxEastern);
+
+      return ch;
+    })
+    .join('');
 };
 
-const loadAccounts = (): LocalCustomerAccount[] => {
-  try {
-    const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+const normalizeWhatsapp = (value: string): string =>
+  normalizeDigits(value).replace(/\D/g, '');
+
+const isSameWhatsapp = (accountNumber: string, inputNumber: string): boolean => {
+  const account = normalizeWhatsapp(accountNumber);
+  const input = normalizeWhatsapp(inputNumber);
+
+  if (!account || !input) return false;
+  if (account === input) return true;
+
+  if (account.length >= 8 && input.length >= 8) {
+    return account.endsWith(input) || input.endsWith(account);
   }
+
+  return false;
 };
 
 export default function CustomerLogin() {
@@ -68,8 +76,16 @@ export default function CustomerLogin() {
     setIsLoading(true);
 
     try {
-      const customer = loadAccounts().find(
-        (a) => String(a.whatsapp_number || '').trim() === whatsappNumber.trim()
+      const accounts = await getCustomerAccounts();
+
+      if (accounts.length === 0) {
+        toast.error('No saved accounts found in this browser profile. Use the same browser/profile where the account was created.');
+        setIsLoading(false);
+        return;
+      }
+
+      const customer = accounts.find(
+        (a) => isSameWhatsapp(String(a.whatsapp_number || ''), whatsappNumber)
       );
 
       if (!customer) {
@@ -101,12 +117,16 @@ export default function CustomerLogin() {
         // Generate new activation code for each login
         const newActivationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Update activation code locally
-        const accounts = loadAccounts();
-        const idx = accounts.findIndex((a) => a.id === customer.id);
-        if (idx !== -1) {
-          accounts[idx] = { ...accounts[idx], activation_code: newActivationCode };
-          localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
+        await updateCustomerAccountRecord(customer.id, { activation_code: newActivationCode });
+
+        const email = String((customer as any)?.email || '').trim();
+        if (email) {
+          const sent = await sendActivationOtpEmail({
+            to: email,
+            customerName: customer.name,
+            code: newActivationCode,
+          });
+          if (sent) toast.success('OTP sent to your email');
         }
 
         // No WhatsApp sending from backend.
@@ -155,13 +175,7 @@ export default function CustomerLogin() {
         return;
       }
 
-      // Mark account as activated locally
-      const accounts = loadAccounts();
-      const idx = accounts.findIndex((a) => a.id === pendingCustomer.id);
-      if (idx !== -1) {
-        accounts[idx] = { ...accounts[idx], is_activated: true };
-        localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
-      }
+      await updateCustomerAccountRecord(pendingCustomer.id, { is_activated: true, status: 'active' });
 
       // Store customer session and navigate
       localStorage.setItem('customer_session', JSON.stringify({

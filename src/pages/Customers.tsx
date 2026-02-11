@@ -14,7 +14,11 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Customer } from '@/types';
-import { CUSTOMER_ACCOUNTS_KEY } from '@/hooks/useCustomerPassword';
+import {
+  deleteCustomerAccountRecord,
+  getCustomerAccounts,
+  updateCustomerAccountRecord,
+} from '@/lib/customerAccountsStorage';
 
 type CustomerStatus = 'active' | 'inactive' | 'blocked';
 
@@ -27,6 +31,7 @@ interface CustomerBalances {
 interface CustomerAccount {
   id: string;
   name: string;
+  email: string;
   whatsapp_number: string;
   balance: number;
   currency: string;
@@ -54,26 +59,11 @@ const Customers = () => {
   // Admin WhatsApp number
   const adminWhatsApp = '201030638992';
 
-  const loadAccounts = (): any[] => {
-    try {
-      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const saveAccounts = (accounts: any[]) => {
-    localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
-  };
-
   const updateCachedCustomers = (customerData: CustomerAccount[]) => {
     const cached: Customer[] = customerData.map((c) => ({
       id: c.id,
       name: c.name,
-      email: '',
+      email: c.email || '',
       whatsapp: c.whatsapp_number,
       currency: c.currency || 'SAR',
       status: c.status,
@@ -99,7 +89,7 @@ const Customers = () => {
   // Fetch customers from localStorage
   const fetchCustomers = async () => {
     try {
-      const accounts = loadAccounts();
+      const accounts = await getCustomerAccounts();
       const customerData: CustomerAccount[] = accounts
         .filter((c: any) => !c?.is_admin && c?.account_type !== 'admin')
         .map((c: any) => {
@@ -110,6 +100,7 @@ const Customers = () => {
           return {
             id: String(c?.id || ''),
             name: String(c?.name || ''),
+            email: String(c?.email || ''),
             whatsapp_number: String(c?.whatsapp_number || ''),
             balance: Number(c?.balance || 0),
             currency: String(c?.currency || 'SAR'),
@@ -165,9 +156,7 @@ const Customers = () => {
       setIsDeleteModalOpen(false);
 
       // Remove from accounts (portal auth + balances)
-      const accounts = loadAccounts();
-      const nextAccounts = accounts.filter((a: any) => String(a?.id || '') !== String(selectedCustomer.id));
-      saveAccounts(nextAccounts);
+      await deleteCustomerAccountRecord(String(selectedCustomer.id));
 
       // Remove from cached customers list
       removeFromArrayStorage('app_customers', (c) => String(c?.id || '') === String(selectedCustomer.id));
@@ -212,16 +201,11 @@ const Customers = () => {
 
   const updateCustomerStatus = async (customer: CustomerAccount, newStatus: CustomerStatus) => {
     try {
-      const accounts = loadAccounts();
-      const idx = accounts.findIndex((a: any) => String(a?.id || '') === String(customer.id));
-      if (idx === -1) throw new Error('account_not_found');
-
-      accounts[idx] = {
-        ...accounts[idx],
+      const updated = await updateCustomerAccountRecord(String(customer.id), {
         status: newStatus,
         is_activated: newStatus === 'active',
-      };
-      saveAccounts(accounts);
+      });
+      if (!updated) throw new Error('account_not_found');
 
       setCustomers(customers.map(c =>
         c.id === customer.id ? { ...c, status: newStatus, is_activated: newStatus === 'active' } : c
@@ -250,23 +234,21 @@ const Customers = () => {
 
   const handleSaveCustomer = async (updatedCustomer: Customer) => {
     try {
-      const accounts = loadAccounts();
-      const idx = accounts.findIndex((a: any) => String(a?.id || '') === String(updatedCustomer.id));
-      if (idx === -1) throw new Error('account_not_found');
-      accounts[idx] = {
-        ...accounts[idx],
+      const updated = await updateCustomerAccountRecord(String(updatedCustomer.id), {
         name: updatedCustomer.name,
+        email: String(updatedCustomer.email || '').trim().toLowerCase(),
         whatsapp_number: String(updatedCustomer.whatsapp || '').replace(/\D/g, ''),
         currency: updatedCustomer.currency,
         status: updatedCustomer.status,
         is_activated: updatedCustomer.status === 'active',
-      };
-      saveAccounts(accounts);
+      });
+      if (!updated) throw new Error('account_not_found');
 
       const next = customers.map(c => 
         c.id === updatedCustomer.id ? { 
           ...c, 
           name: updatedCustomer.name,
+          email: String(updatedCustomer.email || '').trim().toLowerCase(),
           whatsapp_number: String(updatedCustomer.whatsapp || '').replace(/\D/g, ''),
           currency: updatedCustomer.currency,
           status: updatedCustomer.status,
@@ -311,16 +293,11 @@ const Customers = () => {
 
   const activateCustomer = async (customer: CustomerAccount) => {
     try {
-      const accounts = loadAccounts();
-      const idx = accounts.findIndex((a: any) => String(a?.id || '') === String(customer.id));
-      if (idx === -1) throw new Error('account_not_found');
-
-      accounts[idx] = {
-        ...accounts[idx],
+      const updated = await updateCustomerAccountRecord(String(customer.id), {
         is_activated: true,
         status: 'active',
-      };
-      saveAccounts(accounts);
+      });
+      if (!updated) throw new Error('account_not_found');
 
       const next = customers.map(c =>
         c.id === customer.id ? { ...c, is_activated: true, status: 'active' } : c
@@ -356,7 +333,7 @@ const Customers = () => {
   const selectedCustomerForEdit: Customer | null = selectedCustomer ? {
     id: selectedCustomer.id,
     name: selectedCustomer.name,
-    email: '', // Not stored in customer_accounts
+    email: selectedCustomer.email || '',
     whatsapp: selectedCustomer.whatsapp_number,
     currency: selectedCustomer.currency,
     status: selectedCustomer.status,
