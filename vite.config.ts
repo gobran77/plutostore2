@@ -5,6 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // GitHub Pages serves from /<repo>/, so we need a different base path there.
+  base: mode === "github" ? "/plutostore/" : "/",
   server: {
     host: "::",
     port: 8080,
