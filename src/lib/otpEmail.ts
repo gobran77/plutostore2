@@ -4,11 +4,16 @@ type SendActivationOtpPayload = {
   code: string;
 };
 
+type SendActivationOtpResult = {
+  ok: boolean;
+  error?: string;
+};
+
 export const sendActivationOtpEmail = async ({
   to,
   customerName,
   code,
-}: SendActivationOtpPayload): Promise<boolean> => {
+}: SendActivationOtpPayload): Promise<SendActivationOtpResult> => {
   try {
     const response = await fetch('/api/send-otp-email', {
       method: 'POST',
@@ -18,11 +23,14 @@ export const sendActivationOtpEmail = async ({
       body: JSON.stringify({ to, customerName, code }),
     });
 
-    if (!response.ok) return false;
-    return true;
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { ok: false, error: data?.error || `HTTP ${response.status}` };
+    }
+
+    return { ok: true };
   } catch (error) {
     console.error('Failed to send OTP email:', error);
-    return false;
+    return { ok: false, error: 'Network error while sending OTP email' };
   }
 };
-

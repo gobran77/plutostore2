@@ -19,10 +19,12 @@ export default async function handler(req: any, res: any) {
   }
 
   if (!resendApiKey) {
+    console.error('[send-otp-email] Missing RESEND_API_KEY');
     return res.status(500).json({ error: 'RESEND_API_KEY is missing' });
   }
 
-  const { to, customerName, code } = req.body || {};
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+  const { to, customerName, code } = body;
 
   if (!to || !code) {
     return res.status(400).json({ error: 'Missing required fields: to, code' });
@@ -40,12 +42,19 @@ export default async function handler(req: any, res: any) {
     });
 
     if (result.error) {
-      return res.status(500).json({ error: result.error.message || 'Failed to send email' });
+      console.error('[send-otp-email] Resend returned error:', result.error);
+      return res.status(500).json({
+        error: result.error.message || 'Failed to send email',
+        details: result.error.name || 'resend_error',
+      });
     }
 
     return res.status(200).json({ ok: true, id: result.data?.id || null });
   } catch (error: any) {
-    return res.status(500).json({ error: error?.message || 'Internal server error' });
+    console.error('[send-otp-email] Exception:', error);
+    return res.status(500).json({
+      error: error?.message || 'Internal server error',
+      details: error?.name || 'unexpected_error',
+    });
   }
 }
-

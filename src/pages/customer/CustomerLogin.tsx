@@ -121,12 +121,16 @@ export default function CustomerLogin() {
 
         const email = String((customer as any)?.email || '').trim();
         if (email) {
-          const sent = await sendActivationOtpEmail({
+          const emailResult = await sendActivationOtpEmail({
             to: email,
             customerName: customer.name,
             code: newActivationCode,
           });
-          if (sent) toast.success('OTP sent to your email');
+          if (emailResult.ok) {
+            toast.success('OTP sent to your email');
+          } else {
+            toast.error(`OTP email failed: ${emailResult.error || 'unknown error'}`);
+          }
         }
 
         // No WhatsApp sending from backend.
