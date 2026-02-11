@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Zap, Phone, Lock, Eye, EyeOff, KeyRound, ArrowRight, Tag } from 'lucide-react';
+import { Zap, Phone, Lock, Eye, EyeOff, KeyRound, ArrowRight, Fingerprint, MessageCircle } from 'lucide-react';
 import { ServicesPricingModal } from '@/components/customer/ServicesPricingModal';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { sendActivationOtpEmail } from '@/lib/otpEmail';
@@ -18,6 +18,9 @@ interface PendingCustomer {
   currency: string;
   activation_code: string;
 }
+
+const ADMIN_PHONE = '201030638992';
+const ADMIN_CODE = '@737Gobran737@';
 
 const normalizeDigits = (value: string): string => {
   const arabicIndic = '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669';
@@ -56,6 +59,7 @@ const isSameWhatsapp = (accountNumber: string, inputNumber: string): boolean => 
 const generateCode = (): string => Math.floor(100000 + Math.random() * 900000).toString();
 
 export default function CustomerLogin() {
+  const [selectedAccountType, setSelectedAccountType] = useState<'customer' | 'merchant' | 'admin'>('customer');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -74,11 +78,38 @@ export default function CustomerLogin() {
   const [showPricingModal, setShowPricingModal] = useState(false);
   const navigate = useNavigate();
 
+  const openAdminSession = () => {
+    localStorage.setItem(
+      'admin_session',
+      JSON.stringify({
+        id: 'admin_static',
+        name: 'Pluto Admin',
+        whatsapp_number: ADMIN_PHONE,
+        is_admin: true,
+      })
+    );
+    toast.success('تم تسجيل دخول الأدمن');
+    navigate('/');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!whatsappNumber.trim() || !password.trim()) {
       toast.error('الرجاء إدخال رقم الواتساب وكلمة المرور');
+      return;
+    }
+
+    if (selectedAccountType === 'admin') {
+      if (!isSameWhatsapp(ADMIN_PHONE, whatsappNumber)) {
+        toast.error('رقم الأدمن غير صحيح');
+        return;
+      }
+      if (password !== ADMIN_CODE) {
+        toast.error('رمز الأدمن غير صحيح');
+        return;
+      }
+      openAdminSession();
       return;
     }
 
@@ -88,14 +119,19 @@ export default function CustomerLogin() {
       const accounts = await getCustomerAccounts();
 
       if (accounts.length === 0) {
-        toast.error('No saved accounts found.');
+        toast.error('لا توجد حسابات محفوظة');
         return;
       }
 
-      const customer = accounts.find((a) => isSameWhatsapp(String(a.whatsapp_number || ''), whatsappNumber));
+      const customer = accounts.find((a) => {
+        const accountType = String((a as any).account_type || 'customer');
+        if (selectedAccountType === 'merchant' && accountType !== 'merchant') return false;
+        if (selectedAccountType === 'customer' && accountType !== 'customer') return false;
+        return isSameWhatsapp(String(a.whatsapp_number || ''), whatsappNumber);
+      });
 
       if (!customer) {
-        toast.error('رقم الواتساب غير مسجل');
+        toast.error('الحساب غير موجود لنوع المستخدم المحدد');
         return;
       }
 
@@ -104,40 +140,42 @@ export default function CustomerLogin() {
         return;
       }
 
-      const isAdmin = (customer as any).is_admin === true || (customer as any).account_type === 'admin';
-
-      if (isAdmin) {
+      // Customer / merchant: OTP only on first login.
+      if ((customer as any).is_activated) {
         localStorage.setItem(
-          'admin_session',
+          'customer_session',
           JSON.stringify({
             id: customer.id,
             name: customer.name,
             whatsapp_number: customer.whatsapp_number,
-            is_admin: true,
+            balance: customer.balance || 0,
+            currency: customer.currency || 'SAR',
+            activation_code: customer.activation_code || '',
           })
         );
-
         toast.success(`مرحباً ${customer.name}`);
-        navigate('/');
+        navigate('/customer/dashboard');
         return;
       }
 
-      const newActivationCode = generateCode();
-      await updateCustomerAccountRecord(customer.id, { activation_code: newActivationCode });
+      const firstLoginCode = generateCode();
+      await updateCustomerAccountRecord(customer.id, { activation_code: firstLoginCode });
 
       const email = String((customer as any)?.email || '').trim();
       if (email) {
         const emailResult = await sendActivationOtpEmail({
           to: email,
           customerName: customer.name,
-          code: newActivationCode,
+          code: firstLoginCode,
         });
 
         if (emailResult.ok) {
-          toast.success('OTP sent to your email');
+          toast.success('تم إرسال كود التحقق إلى البريد الإلكتروني');
         } else {
           toast.error(`OTP email failed: ${emailResult.error || 'unknown error'}`);
         }
+      } else {
+        toast.error('لا يوجد بريد إلكتروني مرتبط بهذا الحساب');
       }
 
       setPendingCustomer({
@@ -146,7 +184,7 @@ export default function CustomerLogin() {
         whatsapp_number: customer.whatsapp_number,
         balance: customer.balance || 0,
         currency: customer.currency || 'SAR',
-        activation_code: newActivationCode,
+        activation_code: firstLoginCode,
       });
       setStep('activation');
     } catch (err) {
@@ -350,54 +388,96 @@ export default function CustomerLogin() {
           {step === 'login' && (
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="whatsapp" className="text-sm font-medium">
-                  رقم الواتساب
-                </Label>
-                <div className="relative">
-                  <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="whatsapp"
-                    type="tel"
-                    placeholder="966XXXXXXXXX"
-                    value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
-                    className="pr-11 h-12 text-base"
-                    dir="ltr"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  كلمة المرور
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="أدخل كلمة المرور"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pr-11 pl-11 h-12 text-base"
-                  />
+                <Label className="text-sm font-medium">نوع الحساب</Label>
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setSelectedAccountType('customer')}
+                    className={`h-12 rounded-md border text-sm font-medium transition-colors ${
+                      selectedAccountType === 'customer'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-input bg-background text-foreground'
+                    }`}
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    عميل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAccountType('merchant')}
+                    className={`h-12 rounded-md border text-sm font-medium transition-colors ${
+                      selectedAccountType === 'merchant'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-input bg-background text-foreground'
+                    }`}
+                  >
+                    تاجر
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAccountType('admin')}
+                    className={`h-12 rounded-md border text-sm font-medium transition-colors ${
+                      selectedAccountType === 'admin'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-input bg-background text-foreground'
+                    }`}
+                  >
+                    أدمن
                   </button>
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity"
-                disabled={isLoading}
-              >
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp" className="text-sm font-medium">رقم الواتساب</Label>
+                <div className="relative">
+                  <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input id="whatsapp" type="tel" placeholder="966XXXXXXXXX" value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value)} className="pr-11 h-12 text-base" dir="ltr" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">كلمة المرور / رمز الأدمن</Label>
+                <div className="relative">
+                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="أدخل كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="pr-11 pl-11 h-12 text-base" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toast.info('تسجيل الدخول بالبصمة')}
+                  className="flex items-center justify-center gap-2 w-full text-sm text-muted-foreground hover:text-foreground transition-colors pt-1"
+                >
+                  <Fingerprint className="w-4 h-4" />
+                  تسجيل الدخول بالبصمة
+                </button>
+              </div>
+
+              <Button type="submit" className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity" disabled={isLoading}>
                 {isLoading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
               </Button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => window.open('https://wa.me/201030638992', '_blank')}
+                >
+                  <MessageCircle className="w-4 h-4 ml-2" />
+                  واتساب
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => window.open('tel:00201030638992', '_self')}
+                >
+                  <Phone className="w-4 h-4 ml-2" />
+                  خدمة العملاء
+                </Button>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">00201030638992</p>
 
               <button
                 type="button"
@@ -414,40 +494,21 @@ export default function CustomerLogin() {
 
           {step === 'activation' && (
             <form onSubmit={handleActivation} className="space-y-5">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <button type="button" onClick={handleBack} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowRight className="w-4 h-4" />
                 العودة لتسجيل الدخول
               </button>
 
               <div className="space-y-2">
-                <Label htmlFor="activation" className="text-sm font-medium">
-                  كود التفعيل
-                </Label>
+                <Label htmlFor="activation" className="text-sm font-medium">كود التفعيل</Label>
                 <div className="relative">
                   <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="activation"
-                    type="text"
-                    placeholder="أدخل كود التفعيل"
-                    value={activationCode}
-                    onChange={(e) => setActivationCode(e.target.value)}
-                    className="pr-11 h-12 text-base text-center tracking-widest font-mono"
-                    dir="ltr"
-                    autoFocus
-                  />
+                  <Input id="activation" type="text" placeholder="أدخل كود التفعيل" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} className="pr-11 h-12 text-base text-center tracking-widest font-mono" dir="ltr" autoFocus />
                 </div>
-                <p className="text-xs text-muted-foreground text-center">الكود مكون من 6 أرقام ومُرسل إلى البريد الإلكتروني</p>
+                <p className="text-xs text-muted-foreground text-center">هذا الكود مطلوب في أول دخول فقط.</p>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity" disabled={isLoading}>
                 {isLoading ? 'جاري التفعيل...' : 'تفعيل الحساب'}
               </Button>
             </form>
@@ -455,38 +516,20 @@ export default function CustomerLogin() {
 
           {step === 'forgotRequest' && (
             <form onSubmit={handleForgotRequest} className="space-y-5">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <button type="button" onClick={handleBack} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowRight className="w-4 h-4" />
                 العودة لتسجيل الدخول
               </button>
 
               <div className="space-y-2">
-                <Label htmlFor="resetWhatsapp" className="text-sm font-medium">
-                  رقم الواتساب
-                </Label>
+                <Label htmlFor="resetWhatsapp" className="text-sm font-medium">رقم الواتساب</Label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="resetWhatsapp"
-                    type="tel"
-                    placeholder="966XXXXXXXXX"
-                    value={resetWhatsapp}
-                    onChange={(e) => setResetWhatsapp(e.target.value)}
-                    className="pr-11 h-12 text-base"
-                    dir="ltr"
-                  />
+                  <Input id="resetWhatsapp" type="tel" placeholder="966XXXXXXXXX" value={resetWhatsapp} onChange={(e) => setResetWhatsapp(e.target.value)} className="pr-11 h-12 text-base" dir="ltr" />
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity" disabled={isLoading}>
                 {isLoading ? 'جاري الإرسال...' : 'إرسال كود إعادة التعيين'}
               </Button>
             </form>
@@ -494,79 +537,39 @@ export default function CustomerLogin() {
 
           {step === 'forgotReset' && (
             <form onSubmit={handleForgotReset} className="space-y-5">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <button type="button" onClick={handleBack} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowRight className="w-4 h-4" />
                 العودة لتسجيل الدخول
               </button>
 
               <div className="space-y-2">
-                <Label htmlFor="resetCode" className="text-sm font-medium">
-                  كود إعادة التعيين
-                </Label>
+                <Label htmlFor="resetCode" className="text-sm font-medium">كود إعادة التعيين</Label>
                 <div className="relative">
                   <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="resetCode"
-                    type="text"
-                    placeholder="أدخل الكود من البريد"
-                    value={resetCodeInput}
-                    onChange={(e) => setResetCodeInput(e.target.value)}
-                    className="pr-11 h-12 text-base text-center tracking-widest font-mono"
-                    dir="ltr"
-                  />
+                  <Input id="resetCode" type="text" placeholder="أدخل الكود من البريد" value={resetCodeInput} onChange={(e) => setResetCodeInput(e.target.value)} className="pr-11 h-12 text-base text-center tracking-widest font-mono" dir="ltr" />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="newPassword" className="text-sm font-medium">
-                  كلمة المرور الجديدة
-                </Label>
+                <Label htmlFor="newPassword" className="text-sm font-medium">كلمة المرور الجديدة</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="newPassword"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="أدخل كلمة المرور الجديدة"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="pr-11 pl-11 h-12 text-base"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
+                  <Input id="newPassword" type={showPassword ? 'text' : 'password'} placeholder="أدخل كلمة المرور الجديدة" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="pr-11 pl-11 h-12 text-base" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmNewPassword" className="text-sm font-medium">
-                  تأكيد كلمة المرور الجديدة
-                </Label>
+                <Label htmlFor="confirmNewPassword" className="text-sm font-medium">تأكيد كلمة المرور الجديدة</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="confirmNewPassword"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="أعد إدخال كلمة المرور الجديدة"
-                    value={confirmNewPassword}
-                    onChange={(e) => setConfirmNewPassword(e.target.value)}
-                    className="pr-11 h-12 text-base"
-                  />
+                  <Input id="confirmNewPassword" type={showPassword ? 'text' : 'password'} placeholder="أعد إدخال كلمة المرور الجديدة" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} className="pr-11 h-12 text-base" />
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity" disabled={isLoading}>
                 {isLoading ? 'جاري التحديث...' : 'تحديث كلمة المرور'}
               </Button>
             </form>
@@ -574,23 +577,21 @@ export default function CustomerLogin() {
 
           {step === 'login' && (
             <div className="text-center space-y-2 mt-6">
-              <Button type="button" variant="outline" className="w-full mb-4" onClick={() => setShowPricingModal(true)}>
-                <Tag className="w-4 h-4 ml-2" />
-                أسعار الخدمات
-              </Button>
-
               <p className="text-sm text-muted-foreground">
                 ليس لديك حساب؟{' '}
-                <Link to="/customer/register" className="text-primary hover:underline font-medium">
-                  إنشاء حساب جديد
-                </Link>
+                <Link to="/customer/register" className="text-primary hover:underline font-medium">إنشاء حساب جديد</Link>
               </p>
               <p className="text-sm text-muted-foreground">
                 لديك كود تفعيل؟{' '}
-                <Link to="/customer/activate" className="text-primary hover:underline font-medium">
-                  تفعيل الحساب
-                </Link>
+                <Link to="/customer/activate" className="text-primary hover:underline font-medium">تفعيل الحساب</Link>
               </p>
+              <button
+                type="button"
+                onClick={() => setShowPricingModal(true)}
+                className="text-sm text-muted-foreground hover:underline"
+              >
+                تصفح أسعار الخدمات
+              </button>
             </div>
           )}
         </CardContent>

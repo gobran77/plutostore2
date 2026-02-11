@@ -17,11 +17,12 @@ const createHtml = (customerName: string, code: string) => `
       }
       <div style="margin-top: 10px; font-size: 16px; font-weight: 700;">${brandName}</div>
     </div>
-    <h2 style="margin: 0 0 12px;">Activation Code</h2>
-    <p style="margin: 0 0 12px;">Hello ${customerName || 'Customer'},</p>
-    <p style="margin: 0 0 12px;">Use this one-time code to activate your account:</p>
-    <div style="font-size: 32px; font-weight: bold; letter-spacing: 6px; margin: 18px 0; text-align: center;">${code}</div>
-    <p style="margin: 0; color: #666;">This code expires soon. If you did not request it, ignore this email.</p>
+    <h2 style="margin: 0 0 12px; text-align: center;">مرحبًا بك 👋</h2>
+    <p style="margin: 0 0 12px; text-align: center;">رمز الدخول لحسابك هو:</p>
+    <div style="font-size: 32px; font-weight: bold; letter-spacing: 6px; margin: 18px 0; text-align: center;">✨ ${code}</div>
+    <p style="margin: 0 0 12px; text-align: center;">أدخل الرمز لإتمام تسجيل الدخول.</p>
+    <p style="margin: 0 0 12px; text-align: center;">بعدها يمكنك متابعة اشتراكاتك وإدارة خدماتك بكل سهولة من لوحة التحكم الخاصة بك.</p>
+    <p style="margin: 0; color: #666; text-align: center;">Pluto Store AI – خدمات رقمية بثقة وأمان 🚀</p>
   </div>
 `;
 
@@ -44,7 +45,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const resend = new Resend(resendApiKey);
-    const subject = `Activation code: ${code}`;
+    const subject = 'أهلاً بك في Pluto Store AI – رمز الدخول';
 
     const result = await resend.emails.send({
       from: fromEmail,
