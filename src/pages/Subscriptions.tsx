@@ -210,9 +210,11 @@ const Subscriptions = () => {
 
   // Save subscriptions to localStorage
   useEffect(() => {
-    if (subscriptions.length > 0) {
-      localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptions));
+    if (subscriptions.length === 0) {
+      localStorage.removeItem(SUBSCRIPTIONS_STORAGE_KEY);
+      return;
     }
+    localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptions));
   }, [subscriptions]);
 
   // Send WhatsApp notification to customer
