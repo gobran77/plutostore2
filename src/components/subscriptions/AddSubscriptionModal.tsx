@@ -134,7 +134,6 @@ export const AddSubscriptionModal = ({
       });
       setSubscriptionServices([{ id: '1', serviceName: '', price: 0, cost: 0 }]);
       setSelectedLegacySharedServiceId('');
-      setSelectedSharedServiceId('');
       setSelectedSlotId('');
       setAvailableSlots([]);
     }
@@ -448,7 +447,6 @@ export const AddSubscriptionModal = ({
                   setFormData({ ...formData, subscriptionType: e.target.value });
                   if (e.target.value === 'private') {
                     setSelectedLegacySharedServiceId('');
-                    setSelectedSharedServiceId('');
                     setSelectedSlotId('');
                     setAvailableSlots([]);
                   }
