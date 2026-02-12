@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Zap, Phone, Lock, Eye, EyeOff, KeyRound, ArrowRight, Fingerprint, MessageCircle } from 'lucide-react';
+import { Zap, Phone, Lock, Eye, EyeOff, KeyRound, ArrowRight, Fingerprint, MessageCircle, Mail } from 'lucide-react';
 import { ServicesPricingModal } from '@/components/customer/ServicesPricingModal';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { sendActivationOtpEmail } from '@/lib/otpEmail';
@@ -17,6 +17,8 @@ interface PendingCustomer {
   balance: number;
   currency: string;
   activation_code: string;
+  stored_email: string;
+  pending_email?: string;
 }
 
 const ADMIN_PHONE = '201030638992';
@@ -57,6 +59,7 @@ const isSameWhatsapp = (accountNumber: string, inputNumber: string): boolean => 
 };
 
 const generateCode = (): string => Math.floor(100000 + Math.random() * 900000).toString();
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function CustomerLogin() {
   const [selectedAccountType, setSelectedAccountType] = useState<'customer' | 'merchant' | 'admin'>('customer');
@@ -67,6 +70,8 @@ export default function CustomerLogin() {
   const [step, setStep] = useState<'login' | 'activation' | 'forgotRequest' | 'forgotReset'>('login');
 
   const [activationCode, setActivationCode] = useState('');
+  const [activationEmailInput, setActivationEmailInput] = useState('');
+  const [isSendingActivationCode, setIsSendingActivationCode] = useState(false);
   const [pendingCustomer, setPendingCustomer] = useState<PendingCustomer | null>(null);
 
   const [resetWhatsapp, setResetWhatsapp] = useState('');
@@ -90,6 +95,87 @@ export default function CustomerLogin() {
     );
     toast.success('تم تسجيل دخول الأدمن');
     navigate('/');
+  };
+
+  const sendActivationCodeToEmail = async (
+    customerData: PendingCustomer,
+    emailToUse: string
+  ): Promise<string | null> => {
+    const normalizedEmail = emailToUse.trim().toLowerCase();
+    const code = generateCode();
+    await updateCustomerAccountRecord(customerData.id, { activation_code: code });
+
+    const emailResult = await sendActivationOtpEmail({
+      to: normalizedEmail,
+      customerName: customerData.name,
+      code,
+    });
+
+    if (!emailResult.ok) {
+      toast.error(`OTP email failed: ${emailResult.error || 'unknown error'}`);
+      return null;
+    }
+
+    return code;
+  };
+
+  const handleSendActivationCode = async () => {
+    if (!pendingCustomer) {
+      toast.error('تعذر تحديد الحساب، يرجى إعادة تسجيل الدخول');
+      setStep('login');
+      return;
+    }
+
+    const hasStoredEmail = Boolean(pendingCustomer.stored_email);
+    const candidateEmail = hasStoredEmail
+      ? pendingCustomer.stored_email
+      : activationEmailInput.trim().toLowerCase();
+
+    if (!candidateEmail) {
+      toast.error('الرجاء إدخال البريد الإلكتروني');
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(candidateEmail)) {
+      toast.error('صيغة البريد الإلكتروني غير صحيحة');
+      return;
+    }
+
+    if (!hasStoredEmail) {
+      const accounts = await getCustomerAccounts();
+      const emailExists = accounts.some(
+        (a) =>
+          a.id !== pendingCustomer.id &&
+          String((a as any)?.email || '').trim().toLowerCase() === candidateEmail
+      );
+      if (emailExists) {
+        toast.error('البريد الإلكتروني مستخدم في حساب آخر');
+        return;
+      }
+    }
+
+    setIsSendingActivationCode(true);
+    try {
+      const code = await sendActivationCodeToEmail(pendingCustomer, candidateEmail);
+      if (!code) return;
+
+      setPendingCustomer((prev) =>
+        prev
+          ? {
+              ...prev,
+              activation_code: code,
+              pending_email: hasStoredEmail ? prev.pending_email : candidateEmail,
+            }
+          : prev
+      );
+      if (!hasStoredEmail) setActivationEmailInput(candidateEmail);
+      toast.success(`تم إرسال كود التحقق إلى ${candidateEmail}`);
+    } catch (error) {
+      console.error('Failed to send activation code:', error);
+      toast.error('تعذر إرسال كود التحقق');
+    } finally {
+      setIsSendingActivationCode(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -158,35 +244,30 @@ export default function CustomerLogin() {
         return;
       }
 
-      const firstLoginCode = generateCode();
-      await updateCustomerAccountRecord(customer.id, { activation_code: firstLoginCode });
-
-      const email = String((customer as any)?.email || '').trim();
-      if (email) {
-        const emailResult = await sendActivationOtpEmail({
-          to: email,
-          customerName: customer.name,
-          code: firstLoginCode,
-        });
-
-        if (emailResult.ok) {
-          toast.success('تم إرسال كود التحقق إلى البريد الإلكتروني');
-        } else {
-          toast.error(`OTP email failed: ${emailResult.error || 'unknown error'}`);
-        }
-      } else {
-        toast.error('لا يوجد بريد إلكتروني مرتبط بهذا الحساب');
-      }
-
-      setPendingCustomer({
+      const storedEmail = String((customer as any)?.email || '').trim().toLowerCase();
+      const pending: PendingCustomer = {
         id: customer.id,
         name: customer.name,
         whatsapp_number: customer.whatsapp_number,
         balance: customer.balance || 0,
         currency: customer.currency || 'SAR',
-        activation_code: firstLoginCode,
-      });
+        activation_code: '',
+        stored_email: storedEmail,
+      };
+      setPendingCustomer(pending);
+      setActivationEmailInput(storedEmail);
       setStep('activation');
+
+      if (!storedEmail) {
+        toast.info('أضف بريدك الإلكتروني لإرسال كود التحقق');
+        return;
+      }
+
+      const firstLoginCode = await sendActivationCodeToEmail(pending, storedEmail);
+      if (!firstLoginCode) return;
+
+      setPendingCustomer((prev) => (prev ? { ...prev, activation_code: firstLoginCode } : prev));
+      toast.success('تم إرسال كود التحقق إلى البريد الإلكتروني المسجل');
     } catch (err) {
       console.error('Login error:', err);
       toast.error('حدث خطأ أثناء تسجيل الدخول');
@@ -209,6 +290,16 @@ export default function CustomerLogin() {
       return;
     }
 
+    if (!pendingCustomer.activation_code) {
+      toast.error('أرسل كود التحقق أولاً');
+      return;
+    }
+
+    if (!pendingCustomer.stored_email && !pendingCustomer.pending_email) {
+      toast.error('أضف البريد الإلكتروني وأرسل كود التحقق أولاً');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -217,7 +308,11 @@ export default function CustomerLogin() {
         return;
       }
 
-      await updateCustomerAccountRecord(pendingCustomer.id, { is_activated: true, status: 'active' });
+      const patch: Record<string, any> = { is_activated: true, status: 'active' };
+      if (!pendingCustomer.stored_email) {
+        patch.email = String(pendingCustomer.pending_email || '').trim().toLowerCase();
+      }
+      await updateCustomerAccountRecord(pendingCustomer.id, patch);
 
       localStorage.setItem(
         'customer_session',
@@ -351,6 +446,7 @@ export default function CustomerLogin() {
   const handleBack = () => {
     setStep('login');
     setActivationCode('');
+    setActivationEmailInput('');
     setPendingCustomer(null);
     setResetCodeInput('');
     setNewPassword('');
@@ -378,7 +474,7 @@ export default function CustomerLogin() {
           </h2>
           <p className="text-muted-foreground text-sm">
             {step === 'login' && 'أدخل بيانات حسابك للمتابعة'}
-            {step === 'activation' && `مرحباً ${pendingCustomer?.name}، أدخل كود التفعيل`}
+            {step === 'activation' && `مرحباً ${pendingCustomer?.name}، أكمل التحقق للدخول`}
             {step === 'forgotRequest' && 'أدخل رقم الواتساب لإرسال كود إعادة التعيين'}
             {step === 'forgotReset' && 'أدخل الكود وكلمة المرور الجديدة'}
           </p>
@@ -499,17 +595,54 @@ export default function CustomerLogin() {
                 العودة لتسجيل الدخول
               </button>
 
+              {!pendingCustomer?.stored_email && (
+                <div className="space-y-2">
+                  <Label htmlFor="activationEmail" className="text-sm font-medium">إضافة بريد إلكتروني</Label>
+                  <div className="relative">
+                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="activationEmail"
+                      type="email"
+                      placeholder="example@email.com"
+                      value={activationEmailInput}
+                      onChange={(e) => setActivationEmailInput(e.target.value)}
+                      className="pr-11 h-12 text-base"
+                      dir="ltr"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    سيتم حفظ البريد في الحساب بعد إدخال كود التحقق الصحيح فقط.
+                  </p>
+                </div>
+              )}
+
+              {pendingCustomer?.stored_email && (
+                <p className="text-xs text-muted-foreground text-center" dir="ltr">
+                  سيتم الإرسال إلى البريد المسجل: {pendingCustomer.stored_email}
+                </p>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11"
+                onClick={handleSendActivationCode}
+                disabled={isSendingActivationCode}
+              >
+                {isSendingActivationCode ? 'جاري إرسال الكود...' : 'إرسال كود التحقق'}
+              </Button>
+
               <div className="space-y-2">
                 <Label htmlFor="activation" className="text-sm font-medium">كود التفعيل</Label>
                 <div className="relative">
                   <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input id="activation" type="text" placeholder="أدخل كود التفعيل" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} className="pr-11 h-12 text-base text-center tracking-widest font-mono" dir="ltr" autoFocus />
                 </div>
-                <p className="text-xs text-muted-foreground text-center">هذا الكود مطلوب في أول دخول فقط.</p>
+                <p className="text-xs text-muted-foreground text-center">أدخل الكود المرسل إلى البريد لإكمال التفعيل.</p>
               </div>
 
               <Button type="submit" className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity" disabled={isLoading}>
-                {isLoading ? 'جاري التفعيل...' : 'تفعيل الحساب'}
+                {isLoading ? 'جاري التحقق...' : 'تأكيد الكود وتفعيل الحساب'}
               </Button>
             </form>
           )}

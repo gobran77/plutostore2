@@ -173,7 +173,7 @@ export const AddCustomerAccountModal = ({ isOpen, onClose, onSuccess }: AddCusto
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              البريد الإلكتروني
+              البريد الإلكتروني (اختياري)
             </label>
             <input
               type="email"
