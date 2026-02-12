@@ -152,7 +152,7 @@ export function ServiceRequestsManager() {
     if (!selectedRequest || !targetStatus) return;
 
     if (targetStatus === 'activated' && activationSlots.length > 0 && !selectedActivationSlotId) {
-      toast.error('Ø§Ø®ØªØ± Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„/Ø§Ù„Ø³Ù„ÙˆØª Ù‚Ø¨Ù„ Ø§Ù„ØªÙØ¹ÙŠÙ„');
+      toast.error('اختر الإيميل/السلوت قبل التفعيل');
       return;
     }
 
@@ -187,10 +187,10 @@ export function ServiceRequestsManager() {
 
     const statusText = SERVICE_REQUEST_STATUS_LABELS[request.status];
     const message = encodeURIComponent(
-      `Ù…Ø±Ø­Ø¨Ø§Ù‹ ${request.customer.name}ØŒ\n\n` +
-      `Ø¨Ø®ØµÙˆØµ Ø·Ù„Ø¨Ùƒ Ù„Ø®Ø¯Ù…Ø© ${request.service_name} (${request.period_name}):\n` +
-      `Ø§Ù„Ø­Ø§Ù„Ø©: ${statusText}\n\n` +
-      (request.admin_notes ? `Ù…Ù„Ø§Ø­Ø¸Ø§Øª: ${request.admin_notes}` : '')
+      `مرحباً ${request.customer.name}،\n\n` +
+      `بخصوص طلبك لخدمة ${request.service_name} (${request.period_name}):\n` +
+      `الحالة: ${statusText}\n\n` +
+      (request.admin_notes ? `ملاحظات: ${request.admin_notes}` : '')
     );
 
     window.open(`https://wa.me/${request.customer.whatsapp_number}?text=${message}`, '_blank');
@@ -199,17 +199,17 @@ export function ServiceRequestsManager() {
   const getStatusBadge = (status: ServiceRequestStatus) => {
     switch (status) {
       case 'pending':
-        return <Badge className="bg-warning/20 text-warning border-warning/30 gap-1"><AlertCircle className="w-3 h-3" />Ù…Ø¹Ù„Ù‚</Badge>;
+        return <Badge className="bg-warning/20 text-warning border-warning/30 gap-1"><AlertCircle className="w-3 h-3" />معلق</Badge>;
       case 'processing':
-        return <Badge className="bg-info/20 text-info border-info/30 gap-1"><Loader2 className="w-3 h-3" />Ù‚ÙŠØ¯ Ø§Ù„Ù…Ø¹Ø§Ù„Ø¬Ø©</Badge>;
+        return <Badge className="bg-info/20 text-info border-info/30 gap-1"><Loader2 className="w-3 h-3" />قيد المعالجة</Badge>;
       case 'approved':
-        return <Badge className="bg-success/20 text-success border-success/30 gap-1"><CheckCircle2 className="w-3 h-3" />Ù…Ù‚Ø¨ÙˆÙ„</Badge>;
+        return <Badge className="bg-success/20 text-success border-success/30 gap-1"><CheckCircle2 className="w-3 h-3" />مقبول</Badge>;
       case 'rejected':
-        return <Badge className="bg-destructive/20 text-destructive border-destructive/30 gap-1"><XCircle className="w-3 h-3" />Ù…Ø±ÙÙˆØ¶</Badge>;
+        return <Badge className="bg-destructive/20 text-destructive border-destructive/30 gap-1"><XCircle className="w-3 h-3" />مرفوض</Badge>;
       case 'activated':
-        return <Badge className="bg-primary/20 text-primary border-primary/30 gap-1"><Zap className="w-3 h-3" />ØªÙ… Ø§Ù„ØªÙØ¹ÙŠÙ„</Badge>;
+        return <Badge className="bg-primary/20 text-primary border-primary/30 gap-1"><Zap className="w-3 h-3" />تم التفعيل</Badge>;
       case 'failed':
-        return <Badge className="bg-destructive/20 text-destructive border-destructive/30 gap-1"><XCircle className="w-3 h-3" />ÙØ´Ù„</Badge>;
+        return <Badge className="bg-destructive/20 text-destructive border-destructive/30 gap-1"><XCircle className="w-3 h-3" />فشل</Badge>;
       default:
         return null;
     }
@@ -245,20 +245,20 @@ export function ServiceRequestsManager() {
     try {
       const target = transferSlots.find((s) => s.id === transferTargetSlotId);
       if (!target) {
-        toast.error('Ø§Ù„Ø³Ù„ÙˆØª ØºÙŠØ± ØµØ§Ù„Ø­');
+        toast.error('السلوت غير صالح');
         return;
       }
 
       const services = loadJsonArray('app_services');
       const serviceIdx = services.findIndex((s: any) => String(s?.id || '') === String(transferRequest.service_id));
       if (serviceIdx === -1) {
-        toast.error('Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ø§Ù„Ø®Ø¯Ù…Ø©');
+        toast.error('لم يتم العثور على الخدمة');
         return;
       }
 
       const service = services[serviceIdx];
       const accounts = Array.isArray(service?.accounts) ? service.accounts : [];
-      const customerName = transferRequest.customer?.name || 'Ø¹Ù…ÙŠÙ„';
+      const customerName = transferRequest.customer?.name || 'عميل';
       const customerEmail = transferRequest.customer_email || target.email;
 
       const updatedAccounts = accounts.map((acc: any) => {
@@ -309,7 +309,7 @@ export function ServiceRequestsManager() {
       const reqIdx = reqs.findIndex((r: any) => String(r?.id || '') === String(transferRequest.id));
       if (reqIdx !== -1) {
         const prevNotes = String(reqs[reqIdx]?.admin_notes || '');
-        const moveNote = `ØªÙ… Ù†Ù‚Ù„ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¥Ù„Ù‰ Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„: ${target.email}`;
+        const moveNote = `تم نقل العميل إلى الإيميل: ${target.email}`;
         reqs[reqIdx] = {
           ...reqs[reqIdx],
           linked_slot_id: target.id,
@@ -320,13 +320,13 @@ export function ServiceRequestsManager() {
         saveJsonArray('app_service_requests', reqs);
       }
 
-      toast.success('ØªÙ… Ù†Ù‚Ù„ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¥Ù„Ù‰ Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ Ø§Ù„Ø¬Ø¯ÙŠØ¯ Ø¨Ù†Ø¬Ø§Ø­');
+      toast.success('تم نقل العميل إلى الإيميل الجديد بنجاح');
       setTransferRequest(null);
       setTransferSlots([]);
       setTransferTargetSlotId('');
       refetch();
     } catch {
-      toast.error('ØªØ¹Ø°Ø± Ù†Ù‚Ù„ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¨ÙŠÙ† Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„Ø§Øª');
+      toast.error('تعذر نقل العميل بين الإيميلات');
     } finally {
       setIsTransfering(false);
     }
@@ -338,13 +338,13 @@ export function ServiceRequestsManager() {
         return (
           <>
             <Button size="sm" variant="outline" className="h-8 px-2 bg-info/10 hover:bg-info/20 text-info border-info/30" onClick={() => openStatusModal(request, 'processing')}>
-              <Loader2 className="w-3 h-3 ml-1" />Ù…Ø¹Ø§Ù„Ø¬Ø©
+              <Loader2 className="w-3 h-3 ml-1" />معالجة
             </Button>
             <Button size="sm" variant="outline" className="h-8 px-2 bg-success/10 hover:bg-success/20 text-success border-success/30" onClick={() => openStatusModal(request, 'approved')}>
-              <Check className="w-3 h-3 ml-1" />Ù‚Ø¨ÙˆÙ„
+              <Check className="w-3 h-3 ml-1" />قبول
             </Button>
             <Button size="sm" variant="outline" className="h-8 px-2 bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/30" onClick={() => openStatusModal(request, 'rejected')}>
-              <X className="w-3 h-3 ml-1" />Ø±ÙØ¶
+              <X className="w-3 h-3 ml-1" />رفض
             </Button>
           </>
         );
@@ -352,10 +352,10 @@ export function ServiceRequestsManager() {
         return (
           <>
             <Button size="sm" variant="outline" className="h-8 px-2 bg-success/10 hover:bg-success/20 text-success border-success/30" onClick={() => openStatusModal(request, 'approved')}>
-              <Check className="w-3 h-3 ml-1" />Ù‚Ø¨ÙˆÙ„
+              <Check className="w-3 h-3 ml-1" />قبول
             </Button>
             <Button size="sm" variant="outline" className="h-8 px-2 bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/30" onClick={() => openStatusModal(request, 'failed')}>
-              <X className="w-3 h-3 ml-1" />ÙØ´Ù„
+              <X className="w-3 h-3 ml-1" />فشل
             </Button>
           </>
         );
@@ -363,17 +363,17 @@ export function ServiceRequestsManager() {
         return (
           <>
             <Button size="sm" variant="outline" className="h-8 px-2 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30" onClick={() => openStatusModal(request, 'activated')}>
-              <Zap className="w-3 h-3 ml-1" />ØªÙØ¹ÙŠÙ„
+              <Zap className="w-3 h-3 ml-1" />تفعيل
             </Button>
             <Button size="sm" variant="outline" className="h-8 px-2 bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/30" onClick={() => openStatusModal(request, 'failed')}>
-              <X className="w-3 h-3 ml-1" />ÙØ´Ù„
+              <X className="w-3 h-3 ml-1" />فشل
             </Button>
           </>
         );
       case 'activated':
         return (
           <Button size="sm" variant="outline" className="h-8 px-2 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30" onClick={() => openTransferModal(request)}>
-            <ArrowRightLeft className="w-3 h-3 ml-1" />Ù†Ù‚Ù„ Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„
+            <ArrowRightLeft className="w-3 h-3 ml-1" />نقل الإيميل
           </Button>
         );
       default:
@@ -388,47 +388,47 @@ export function ServiceRequestsManager() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-warning/20 flex items-center justify-center"><Clock className="w-4 h-4 text-warning" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.pending}</p><p className="text-[10px] text-muted-foreground">Ù…Ø¹Ù„Ù‚</p></div></div></div>
-        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-info/20 flex items-center justify-center"><Loader2 className="w-4 h-4 text-info" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.processing}</p><p className="text-[10px] text-muted-foreground">Ù…Ø¹Ø§Ù„Ø¬Ø©</p></div></div></div>
-        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-success/20 flex items-center justify-center"><Check className="w-4 h-4 text-success" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.approved}</p><p className="text-[10px] text-muted-foreground">Ù…Ù‚Ø¨ÙˆÙ„</p></div></div></div>
-        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center"><Zap className="w-4 h-4 text-primary" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.activated}</p><p className="text-[10px] text-muted-foreground">Ù…ÙØ¹Ù„</p></div></div></div>
-        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-destructive/20 flex items-center justify-center"><X className="w-4 h-4 text-destructive" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.rejected}</p><p className="text-[10px] text-muted-foreground">Ù…Ø±ÙÙˆØ¶</p></div></div></div>
-        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-destructive/20 flex items-center justify-center"><XCircle className="w-4 h-4 text-destructive" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.failed}</p><p className="text-[10px] text-muted-foreground">ÙØ´Ù„</p></div></div></div>
+        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-warning/20 flex items-center justify-center"><Clock className="w-4 h-4 text-warning" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.pending}</p><p className="text-[10px] text-muted-foreground">معلق</p></div></div></div>
+        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-info/20 flex items-center justify-center"><Loader2 className="w-4 h-4 text-info" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.processing}</p><p className="text-[10px] text-muted-foreground">معالجة</p></div></div></div>
+        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-success/20 flex items-center justify-center"><Check className="w-4 h-4 text-success" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.approved}</p><p className="text-[10px] text-muted-foreground">مقبول</p></div></div></div>
+        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center"><Zap className="w-4 h-4 text-primary" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.activated}</p><p className="text-[10px] text-muted-foreground">مفعل</p></div></div></div>
+        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-destructive/20 flex items-center justify-center"><X className="w-4 h-4 text-destructive" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.rejected}</p><p className="text-[10px] text-muted-foreground">مرفوض</p></div></div></div>
+        <div className="bg-card rounded-xl border border-border p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-destructive/20 flex items-center justify-center"><XCircle className="w-4 h-4 text-destructive" /></div><div><p className="text-xl font-bold text-foreground">{statusCounts.failed}</p><p className="text-[10px] text-muted-foreground">فشل</p></div></div></div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Ø§Ù„Ø­Ø§Ù„Ø©" /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue placeholder="الحالة" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Ø§Ù„ÙƒÙ„ ({requests.length})</SelectItem>
-              <SelectItem value="pending">Ù…Ø¹Ù„Ù‚ ({statusCounts.pending})</SelectItem>
-              <SelectItem value="processing">Ù…Ø¹Ø§Ù„Ø¬Ø© ({statusCounts.processing})</SelectItem>
-              <SelectItem value="approved">Ù…Ù‚Ø¨ÙˆÙ„ ({statusCounts.approved})</SelectItem>
-              <SelectItem value="activated">Ù…ÙØ¹Ù„ ({statusCounts.activated})</SelectItem>
-              <SelectItem value="rejected">Ù…Ø±ÙÙˆØ¶ ({statusCounts.rejected})</SelectItem>
-              <SelectItem value="failed">ÙØ´Ù„ ({statusCounts.failed})</SelectItem>
+              <SelectItem value="all">الكل ({requests.length})</SelectItem>
+              <SelectItem value="pending">معلق ({statusCounts.pending})</SelectItem>
+              <SelectItem value="processing">معالجة ({statusCounts.processing})</SelectItem>
+              <SelectItem value="approved">مقبول ({statusCounts.approved})</SelectItem>
+              <SelectItem value="activated">مفعل ({statusCounts.activated})</SelectItem>
+              <SelectItem value="rejected">مرفوض ({statusCounts.rejected})</SelectItem>
+              <SelectItem value="failed">فشل ({statusCounts.failed})</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <Select value={serviceFilter} onValueChange={setServiceFilter}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Ø§Ù„Ø®Ø¯Ù…Ø©" /></SelectTrigger>
+          <SelectTrigger className="w-40"><SelectValue placeholder="الخدمة" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø®Ø¯Ù…Ø§Øª</SelectItem>
+            <SelectItem value="all">جميع الخدمات</SelectItem>
             {serviceNames.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="sm" onClick={refetch}><RefreshCw className="w-4 h-4 ml-1" />ØªØ­Ø¯ÙŠØ«</Button>
+        <Button variant="outline" size="sm" onClick={refetch}><RefreshCw className="w-4 h-4 ml-1" />تحديث</Button>
       </div>
 
       {filteredRequests.length === 0 ? (
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª</h3>
-          <p className="text-muted-foreground">{statusFilter === 'all' ? 'Ù„Ù… ÙŠØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø£ÙŠ Ø·Ù„Ø¨Ø§Øª Ø®Ø¯Ù…Ø§Øª Ø¨Ø¹Ø¯' : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ø¨Ù‡Ø°Ù‡ Ø§Ù„Ø­Ø§Ù„Ø©'}</p>
+          <h3 className="text-lg font-semibold text-foreground mb-2">لا توجد طلبات</h3>
+          <p className="text-muted-foreground">{statusFilter === 'all' ? 'لم يتم استلام أي طلبات خدمات بعد' : 'لا توجد طلبات بهذه الحالة'}</p>
         </div>
       ) : (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -436,13 +436,13 @@ export function ServiceRequestsManager() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ø§Ù„Ø¹Ù…ÙŠÙ„</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ø§Ù„Ø®Ø¯Ù…Ø©</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ø§Ù„Ù…Ø¯Ø©</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ø§Ù„Ø³Ø¹Ø±</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ø§Ù„Ø­Ø§Ù„Ø©</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ø§Ù„ØªØ§Ø±ÙŠØ®</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">العميل</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">الخدمة</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">المدة</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">السعر</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">الحالة</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">التاريخ</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -452,7 +452,7 @@ export function ServiceRequestsManager() {
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center"><User className="w-4 h-4 text-primary" /></div>
                         <div>
-                          <p className="font-medium text-foreground">{request.customer?.name || 'Ø¹Ù…ÙŠÙ„'}</p>
+                          <p className="font-medium text-foreground">{request.customer?.name || 'عميل'}</p>
                           <p className="text-xs text-muted-foreground">{request.customer?.whatsapp_number}</p>
                         </div>
                       </div>
@@ -463,17 +463,17 @@ export function ServiceRequestsManager() {
                         <p className="text-xs text-primary flex items-center gap-1 mt-1"><Mail className="w-3 h-3" />{fixTextEncoding(request.linked_login_email || request.customer_email || '')}</p>
                       )}
                     </td>
-                    <td className="p-4"><Badge variant="outline">{request.period_name}</Badge><p className="text-xs text-muted-foreground mt-1">{request.period_days} ÙŠÙˆÙ…</p></td>
+                    <td className="p-4"><Badge variant="outline">{request.period_name}</Badge><p className="text-xs text-muted-foreground mt-1">{request.period_days} يوم</p></td>
                     <td className="p-4"><div className="flex items-center gap-1"><DollarSign className="w-4 h-4 text-success" /><span className="font-semibold text-foreground">{request.price} {getCurrencySymbol(request.currency)}</span></div></td>
                     <td className="p-4">{getStatusBadge(request.status)}{request.admin_notes && <p className="text-xs text-muted-foreground mt-1 max-w-40 truncate" title={fixTextEncoding(request.admin_notes)}>{fixTextEncoding(request.admin_notes)}</p>}</td>
                     <td className="p-4"><div className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-3 h-3" /><span className="text-sm">{formatDistanceToNow(new Date(request.created_at), { addSuffix: true, locale: ar })}</span></div><p className="text-xs text-muted-foreground mt-1">{format(new Date(request.created_at), 'yyyy/MM/dd HH:mm')}</p></td>
                     <td className="p-4">
                       <div className="flex items-center gap-1 flex-wrap">
                         {getStatusActions(request)}
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openWhatsApp(request)} title="ÙˆØ§ØªØ³Ø§Ø¨">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openWhatsApp(request)} title="واتساب">
                           <MessageCircle className="w-4 h-4 text-success" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => { setDeleteConfirmId(request.id); setDeleteRequest_(request); }} title="Ø­Ø°Ù">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => { setDeleteConfirmId(request.id); setDeleteRequest_(request); }} title="حذف">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -495,30 +495,30 @@ export function ServiceRequestsManager() {
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">{targetStatus && getStatusBadge(targetStatus)}ØªØºÙŠÙŠØ± Ø­Ø§Ù„Ø© Ø§Ù„Ø·Ù„Ø¨</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">{targetStatus && getStatusBadge(targetStatus)}تغيير حالة الطلب</DialogTitle>
           </DialogHeader>
 
           {selectedRequest && (
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between"><span className="text-muted-foreground">Ø§Ù„Ø¹Ù…ÙŠÙ„:</span><span className="font-medium">{selectedRequest.customer?.name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Ø§Ù„Ø®Ø¯Ù…Ø©:</span><span className="font-medium">{selectedRequest.service_name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Ø§Ù„Ø³Ø¹Ø±:</span><span className="font-medium text-primary">{selectedRequest.price} {getCurrencySymbol(selectedRequest.currency)}</span></div>
-                {selectedRequest.customer_email && <div className="flex justify-between"><span className="text-muted-foreground">Ø¥ÙŠÙ…ÙŠÙ„ Ø§Ù„ØªÙØ¹ÙŠÙ„:</span><span className="font-medium text-primary" dir="ltr">{selectedRequest.customer_email}</span></div>}
+                <div className="flex justify-between"><span className="text-muted-foreground">العميل:</span><span className="font-medium">{selectedRequest.customer?.name}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">الخدمة:</span><span className="font-medium">{selectedRequest.service_name}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">السعر:</span><span className="font-medium text-primary">{selectedRequest.price} {getCurrencySymbol(selectedRequest.currency)}</span></div>
+                {selectedRequest.customer_email && <div className="flex justify-between"><span className="text-muted-foreground">إيميل التفعيل:</span><span className="font-medium text-primary" dir="ltr">{selectedRequest.customer_email}</span></div>}
               </div>
 
               {(targetStatus === 'rejected' || targetStatus === 'failed') && (
-                <div className="bg-warning/10 border border-warning/30 rounded-lg p-3"><p className="text-sm text-warning">Ø³ÙŠØªÙ… Ø§Ø³ØªØ±Ø¯Ø§Ø¯ Ù…Ø¨Ù„Øº {selectedRequest.price} {getCurrencySymbol(selectedRequest.currency)} Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¹Ù…ÙŠÙ„</p></div>
+                <div className="bg-warning/10 border border-warning/30 rounded-lg p-3"><p className="text-sm text-warning">سيتم استرداد مبلغ {selectedRequest.price} {getCurrencySymbol(selectedRequest.currency)} لرصيد العميل</p></div>
               )}
 
               {targetStatus === 'activated' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Ø§Ø®ØªØ± Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„/Ø§Ù„Ø³Ù„ÙˆØª Ø§Ù„Ù…ØªØ§Ø­ Ù„Ù„ØªÙØ¹ÙŠÙ„</label>
+                  <label className="text-sm font-medium">اختر الإيميل/السلوت المتاح للتفعيل</label>
                   {activationSlots.length === 0 ? (
-                    <div className="text-sm rounded-lg border border-border bg-muted/40 p-3 text-muted-foreground">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø³Ù„ÙˆØªØ§Øª Ù…Ø´ØªØ±ÙƒØ© Ù…ØªØ§Ø­Ø©. Ø³ÙŠØªÙ… Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø¥ÙŠÙ…ÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨ Ø¥Ù† ÙˆØ¬Ø¯.</div>
+                    <div className="text-sm rounded-lg border border-border bg-muted/40 p-3 text-muted-foreground">لا توجد سلوتات مشتركة متاحة. سيتم استخدام إيميل الطلب إن وجد.</div>
                   ) : (
                     <select className="input-field" value={selectedActivationSlotId} onChange={(e) => setSelectedActivationSlotId(e.target.value)}>
-                      <option value="">Ø§Ø®ØªØ± Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„/Ø§Ù„Ø³Ù„ÙˆØª</option>
+                      <option value="">اختر الإيميل/السلوت</option>
                       {activationSlots.map((slot) => (
                         <option key={slot.id} value={slot.id}>{slot.email} {slot.slotName ? `- ${slot.slotName}` : ''} ({slot.usersCount})</option>
                       ))}
@@ -528,15 +528,15 @@ export function ServiceRequestsManager() {
               )}
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Ù…Ù„Ø§Ø­Ø¸Ø§Øª (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)</label>
-                <Textarea placeholder="Ø£Ø¶Ù Ù…Ù„Ø§Ø­Ø¸Ø©..." value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} rows={3} />
+                <label className="text-sm font-medium">ملاحظات (اختياري)</label>
+                <Textarea placeholder="أضف ملاحظة..." value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} rows={3} />
               </div>
             </div>
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setSelectedRequest(null); setTargetStatus(null); setAdminNotes(''); setActivationSlots([]); setSelectedActivationSlotId(''); }}>Ø¥Ù„ØºØ§Ø¡</Button>
-            <Button onClick={handleStatusChange} disabled={isProcessing}>{isProcessing ? <RefreshCw className="w-4 h-4 animate-spin ml-2" /> : <Check className="w-4 h-4 ml-2" />}ØªØ£ÙƒÙŠØ¯</Button>
+            <Button variant="outline" onClick={() => { setSelectedRequest(null); setTargetStatus(null); setAdminNotes(''); setActivationSlots([]); setSelectedActivationSlotId(''); }}>إلغاء</Button>
+            <Button onClick={handleStatusChange} disabled={isProcessing}>{isProcessing ? <RefreshCw className="w-4 h-4 animate-spin ml-2" /> : <Check className="w-4 h-4 ml-2" />}تأكيد</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -544,24 +544,24 @@ export function ServiceRequestsManager() {
       <Dialog open={!!transferRequest} onOpenChange={() => { setTransferRequest(null); setTransferSlots([]); setTransferTargetSlotId(''); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><ArrowRightLeft className="w-5 h-5 text-primary" />Ù†Ù‚Ù„ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¥Ù„Ù‰ Ø¥ÙŠÙ…ÙŠÙ„ Ø¢Ø®Ø±</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><ArrowRightLeft className="w-5 h-5 text-primary" />نقل العميل إلى إيميل آخر</DialogTitle>
           </DialogHeader>
 
           {transferRequest && (
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between"><span className="text-muted-foreground">Ø§Ù„Ø¹Ù…ÙŠÙ„:</span><span className="font-medium">{transferRequest.customer?.name || 'Ø¹Ù…ÙŠÙ„'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Ø§Ù„Ø®Ø¯Ù…Ø©:</span><span className="font-medium">{transferRequest.service_name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ Ø§Ù„Ø­Ø§Ù„ÙŠ:</span><span className="font-medium text-primary" dir="ltr">{transferRequest.linked_login_email || transferRequest.customer_email || '-'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">العميل:</span><span className="font-medium">{transferRequest.customer?.name || 'عميل'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">الخدمة:</span><span className="font-medium">{transferRequest.service_name}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">الإيميل الحالي:</span><span className="font-medium text-primary" dir="ltr">{transferRequest.linked_login_email || transferRequest.customer_email || '-'}</span></div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ Ø§Ù„Ø¬Ø¯ÙŠØ¯</label>
+                <label className="text-sm font-medium">الإيميل الجديد</label>
                 {transferSlots.length === 0 ? (
-                  <div className="text-sm rounded-lg border border-border bg-muted/40 p-3 text-muted-foreground">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¥ÙŠÙ…ÙŠÙ„Ø§Øª/Ø³Ù„ÙˆØªØ§Øª Ù…ØªØ§Ø­Ø© Ù„Ù‡Ø°Ù‡ Ø§Ù„Ø®Ø¯Ù…Ø©</div>
+                  <div className="text-sm rounded-lg border border-border bg-muted/40 p-3 text-muted-foreground">لا توجد إيميلات/سلوتات متاحة لهذه الخدمة</div>
                 ) : (
                   <select className="input-field" value={transferTargetSlotId} onChange={(e) => setTransferTargetSlotId(e.target.value)}>
-                    <option value="">Ø§Ø®ØªØ± Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ Ø§Ù„Ø¬Ø¯ÙŠØ¯</option>
+                    <option value="">اختر الإيميل الجديد</option>
                     {transferSlots.map((slot) => (
                       <option key={slot.id} value={slot.id}>{slot.email} {slot.slotName ? `- ${slot.slotName}` : ''} ({slot.usersCount})</option>
                     ))}
@@ -572,8 +572,8 @@ export function ServiceRequestsManager() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setTransferRequest(null); setTransferSlots([]); setTransferTargetSlotId(''); }}>Ø¥Ù„ØºØ§Ø¡</Button>
-            <Button onClick={handleTransferSlot} disabled={isTransfering || !transferTargetSlotId}>{isTransfering ? <RefreshCw className="w-4 h-4 animate-spin ml-2" /> : <ArrowRightLeft className="w-4 h-4 ml-2" />}Ù†Ù‚Ù„</Button>
+            <Button variant="outline" onClick={() => { setTransferRequest(null); setTransferSlots([]); setTransferTargetSlotId(''); }}>إلغاء</Button>
+            <Button onClick={handleTransferSlot} disabled={isTransfering || !transferTargetSlotId}>{isTransfering ? <RefreshCw className="w-4 h-4 animate-spin ml-2" /> : <ArrowRightLeft className="w-4 h-4 ml-2" />}نقل</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -581,15 +581,15 @@ export function ServiceRequestsManager() {
       <Dialog open={!!deleteConfirmId} onOpenChange={() => { setDeleteConfirmId(null); setDeleteRequest_(null); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive"><Trash2 className="w-5 h-5" />Ø­Ø°Ù Ø§Ù„Ø·Ù„Ø¨</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-destructive"><Trash2 className="w-5 h-5" />حذف الطلب</DialogTitle>
           </DialogHeader>
-          <p className="text-muted-foreground">Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ù‡Ø°Ø§ Ø§Ù„Ø·Ù„Ø¨ØŸ</p>
+          <p className="text-muted-foreground">هل أنت متأكد من حذف هذا الطلب؟</p>
           {deleteRequest_ && deleteRequest_.status !== 'activated' && (
-            <div className="bg-warning/10 border border-warning/30 rounded-lg p-3"><p className="text-sm text-warning">Ø³ÙŠØªÙ… Ø§Ø³ØªØ±Ø¯Ø§Ø¯ Ù…Ø¨Ù„Øº {deleteRequest_.price} {getCurrencySymbol(deleteRequest_.currency)} Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¹Ù…ÙŠÙ„</p></div>
+            <div className="bg-warning/10 border border-warning/30 rounded-lg p-3"><p className="text-sm text-warning">سيتم استرداد مبلغ {deleteRequest_.price} {getCurrencySymbol(deleteRequest_.currency)} لرصيد العميل</p></div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setDeleteConfirmId(null); setDeleteRequest_(null); }}>Ø¥Ù„ØºØ§Ø¡</Button>
-            <Button variant="destructive" onClick={handleDelete}><Trash2 className="w-4 h-4 ml-2" />Ø­Ø°Ù</Button>
+            <Button variant="outline" onClick={() => { setDeleteConfirmId(null); setDeleteRequest_(null); }}>إلغاء</Button>
+            <Button variant="destructive" onClick={handleDelete}><Trash2 className="w-4 h-4 ml-2" />حذف</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -58,7 +58,7 @@ const getPaymentStatusBadge = (status: PaymentStatus, dueDate?: Date) => {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-success/10 text-success text-xs font-medium">
           <CreditCard className="w-3 h-3" />
-          Ù…Ø¯ÙÙˆØ¹
+          مدفوع
         </span>
       );
     case 'partial':
@@ -67,7 +67,7 @@ const getPaymentStatusBadge = (status: PaymentStatus, dueDate?: Date) => {
           isOverdue ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'
         }`}>
           <Clock className="w-3 h-3" />
-          Ø¬Ø²Ø¦ÙŠ {isOverdue && '(Ù…ØªØ£Ø®Ø±)'}
+          جزئي {isOverdue && '(متأخر)'}
         </span>
       );
     case 'deferred':
@@ -76,7 +76,7 @@ const getPaymentStatusBadge = (status: PaymentStatus, dueDate?: Date) => {
           isOverdue ? 'bg-destructive/10 text-destructive animate-pulse' : 'bg-destructive/10 text-destructive'
         }`}>
           <AlertCircle className="w-3 h-3" />
-          Ø¢Ø¬Ù„ {isOverdue && '(Ù…ØªØ£Ø®Ø±!)'}
+          آجل {isOverdue && '(متأخر!)'}
         </span>
       );
     default:
@@ -294,8 +294,8 @@ const Subscriptions = () => {
     addCustomerActivity({
       customerId: newSubscription.customerId,
       type: 'subscription_add',
-      title: 'ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ø´ØªØ±Ø§Ùƒ Ø¬Ø¯ÙŠØ¯',
-      description: `${newSubscription.services.map((s) => s.serviceName).join('ØŒ ') || 'Ø®Ø¯Ù…Ø©'}`,
+      title: 'تمت إضافة اشتراك جديد',
+      description: `${newSubscription.services.map((s) => s.serviceName).join('، ') || 'خدمة'}`,
       amount: Number(newSubscription.totalPrice || 0),
       currency: newSubscription.currency,
       meta: {
@@ -303,7 +303,7 @@ const Subscriptions = () => {
       },
     });
     
-    toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ ÙˆØ¥Ù†Ø´Ø§Ø¡ Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø¨Ù†Ø¬Ø§Ø­');
+    toast.success('تمت إضافة الاشتراك وإنشاء الفاتورة بنجاح');
   };
 
   const handleDeleteSubscription = async () => {
@@ -353,8 +353,8 @@ const Subscriptions = () => {
       addCustomerActivity({
         customerId: selectedSubscription.customerId,
         type: 'subscription_delete',
-        title: 'ØªÙ… Ø­Ø°Ù Ø§Ø´ØªØ±Ø§Ùƒ',
-        description: selectedSubscription.services.map((s) => s.serviceName).join('ØŒ ') || 'Ø§Ø´ØªØ±Ø§Ùƒ',
+        title: 'تم حذف اشتراك',
+        description: selectedSubscription.services.map((s) => s.serviceName).join('، ') || 'اشتراك',
         amount: Number(selectedSubscription.totalPrice || 0),
         currency: selectedSubscription.currency,
         meta: {
@@ -362,7 +362,7 @@ const Subscriptions = () => {
         },
       });
 
-      toast.success('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ ÙˆØ§Ù„ÙØ§ØªÙˆØ±Ø© ÙˆØ§Ù„Ø¯ÙØ¹Ø© Ø§Ù„Ù…Ø±ØªØ¨Ø·Ø© Ø¨Ù†Ø¬Ø§Ø­');
+      toast.success('تم حذف الاشتراك والفاتورة والدفعة المرتبطة بنجاح');
       setIsDeleteModalOpen(false);
       setSelectedSubscription(null);
     }
@@ -381,7 +381,7 @@ const Subscriptions = () => {
   const columns = [
     {
       key: 'customer',
-      header: 'Ø§Ù„Ø¹Ù…ÙŠÙ„',
+      header: 'العميل',
       render: (sub: Subscription) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
@@ -398,7 +398,7 @@ const Subscriptions = () => {
     },
     {
       key: 'services',
-      header: 'Ø§Ù„Ø®Ø¯Ù…Ø§Øª',
+      header: 'الخدمات',
       render: (sub: Subscription) => (
         <div className="flex flex-wrap gap-1">
           {sub.services.map((service, idx) => (
@@ -415,7 +415,7 @@ const Subscriptions = () => {
     },
     {
       key: 'dates',
-      header: 'ÙØªØ±Ø© Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ',
+      header: 'فترة الاشتراك',
       render: (sub: Subscription) => (
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -427,12 +427,12 @@ const Subscriptions = () => {
     },
     {
       key: 'status',
-      header: 'Ø§Ù„Ø­Ø§Ù„Ø©',
+      header: 'الحالة',
       render: (sub: Subscription) => <StatusBadge status={sub.status} />,
     },
     {
       key: 'paymentStatus',
-      header: 'Ø§Ù„Ø¯ÙØ¹',
+      header: 'الدفع',
       render: (sub: Subscription) => {
         const Icon = getPaymentMethodIcon(sub.paymentMethod?.type);
         return (
@@ -455,7 +455,7 @@ const Subscriptions = () => {
     },
     {
       key: 'amount',
-      header: 'Ø§Ù„Ù…Ø¨Ù„Øº',
+      header: 'المبلغ',
       render: (sub: Subscription) => {
         const remaining = sub.totalPrice - sub.paidAmount;
         return (
@@ -463,7 +463,7 @@ const Subscriptions = () => {
             <p className="font-semibold text-foreground">{sub.totalPrice} {sub.currency}</p>
             {sub.paymentStatus !== 'paid' && (
               <p className="text-xs text-destructive font-medium">
-                Ù…ØªØ¨Ù‚ÙŠ: {remaining} {sub.currency}
+                متبقي: {remaining} {sub.currency}
               </p>
             )}
           </div>
@@ -472,7 +472,7 @@ const Subscriptions = () => {
     },
     {
       key: 'profit',
-      header: 'Ø§Ù„Ø±Ø¨Ø­',
+      header: 'الربح',
       render: (sub: Subscription) => {
         const profit = sub.totalPrice - sub.totalCost;
         const profitMargin = sub.totalPrice > 0 ? ((profit / sub.totalPrice) * 100).toFixed(1) : '0';
@@ -481,21 +481,21 @@ const Subscriptions = () => {
             <p className={`font-semibold ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>
               {profit} {sub.currency}
             </p>
-            <p className="text-xs text-muted-foreground">{profitMargin}% Ù‡Ø§Ù…Ø´</p>
+            <p className="text-xs text-muted-foreground">{profitMargin}% هامش</p>
           </div>
         );
       },
     },
     {
       key: 'autoRenew',
-      header: 'Ø§Ù„ØªØ¬Ø¯ÙŠØ¯ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ',
+      header: 'التجديد التلقائي',
       render: (sub: Subscription) => (
         <div className="flex items-center gap-2">
           <RefreshCw
             className={`w-4 h-4 ${sub.autoRenew ? 'text-success' : 'text-muted-foreground'}`}
           />
           <span className={sub.autoRenew ? 'text-success text-sm' : 'text-muted-foreground text-sm'}>
-            {sub.autoRenew ? 'Ù…ÙØ¹Ù‘Ù„' : 'Ù…Ø¹Ø·Ù‘Ù„'}
+            {sub.autoRenew ? 'مفعّل' : 'معطّل'}
           </span>
         </div>
       ),
@@ -509,35 +509,35 @@ const Subscriptions = () => {
         
         const sendWhatsApp = () => {
           if (!whatsappNumber) {
-            toast.error('Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø±Ù‚Ù… ÙˆØ§ØªØ³Ø§Ø¨ Ù…Ø³Ø¬Ù„ Ù„Ù‡Ø°Ø§ Ø§Ù„Ø¹Ù…ÙŠÙ„');
+            toast.error('لا يوجد رقم واتساب مسجل لهذا العميل');
             return;
           }
           
-          const statusText = sub.status === 'active' ? 'Ù†Ø´Ø·' : sub.status === 'expiring_soon' ? 'Ù‚Ø±ÙŠØ¨ Ù…Ù† Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡' : sub.status === 'expired' ? 'Ù…Ù†ØªÙ‡ÙŠ' : sub.status;
-          const paymentText = sub.paymentStatus === 'paid' ? 'Ù…Ø¯ÙÙˆØ¹' : sub.paymentStatus === 'partial' ? `Ø¬Ø²Ø¦ÙŠ (${sub.paidAmount} Ù…Ù† ${sub.totalPrice})` : 'Ø¢Ø¬Ù„';
+          const statusText = sub.status === 'active' ? 'نشط' : sub.status === 'expiring_soon' ? 'قريب من الانتهاء' : sub.status === 'expired' ? 'منتهي' : sub.status;
+          const paymentText = sub.paymentStatus === 'paid' ? 'مدفوع' : sub.paymentStatus === 'partial' ? `جزئي (${sub.paidAmount} من ${sub.totalPrice})` : 'آجل';
           
           const message = [
-            `*ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ*`,
+            `*تفاصيل الاشتراك*`,
             ``,
-            `Ø§Ù„Ø¹Ù…ÙŠÙ„: ${sub.customerName}`,
-            `Ø§Ù„ÙƒÙˆØ¯: #${sub.customerCode || 'ØºÙŠØ± Ù…Ø­Ø¯Ø¯'}`,
+            `العميل: ${sub.customerName}`,
+            `الكود: #${sub.customerCode || 'غير محدد'}`,
             ``,
-            `Ø§Ù„Ø®Ø¯Ù…Ø§Øª:`,
+            `الخدمات:`,
             ...sub.services.map(s => `- ${s.serviceName}: ${s.price} ${sub.currency}`),
             ``,
-            `ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨Ø¯Ø§ÙŠØ©: ${sub.startDate.toLocaleDateString('ar-SA')}`,
-            `ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡: ${sub.endDate.toLocaleDateString('ar-SA')}`,
+            `تاريخ البداية: ${sub.startDate.toLocaleDateString('ar-SA')}`,
+            `تاريخ الانتهاء: ${sub.endDate.toLocaleDateString('ar-SA')}`,
             ``,
-            `Ø­Ø§Ù„Ø© Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ: ${statusText}`,
-            `Ø­Ø§Ù„Ø© Ø§Ù„Ø¯ÙØ¹: ${paymentText}`,
+            `حالة الاشتراك: ${statusText}`,
+            `حالة الدفع: ${paymentText}`,
             ``,
-            `Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: ${sub.totalPrice} ${sub.currency}`,
-            sub.discount > 0 ? `Ø§Ù„Ø®ØµÙ…: ${sub.discount} ${sub.currency}` : '',
+            `المبلغ الإجمالي: ${sub.totalPrice} ${sub.currency}`,
+            sub.discount > 0 ? `الخصم: ${sub.discount} ${sub.currency}` : '',
             ``,
-            `Ø´ÙƒØ±Ø§Ù‹ Ù„Ø«Ù‚ØªÙƒÙ… Ø¨Ù†Ø§!`,
+            `شكراً لثقتكم بنا!`,
             ``,
-            `ðŸ“± *Ù…Ù„Ø§Ø­Ø¸Ø©:*`,
-            `Ù„Ù„ØªØ³Ø¬ÙŠÙ„ ÙˆÙ…ØªØ§Ø¨Ø¹Ø© ØªÙØ§ØµÙŠÙ„ Ø­Ø³Ø§Ø¨ÙƒØŒ ÙŠØ±Ø¬Ù‰ Ø¥Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ø¹Ù„Ù‰ Ø§Ù„Ù…ÙˆÙ‚Ø¹ Ø§Ù„ØªØ§Ù„ÙŠ:`,
+            `📱 *ملاحظة:*`,
+            `للتسجيل ومتابعة تفاصيل حسابك، يرجى إنشاء حساب على الموقع التالي:`,
             `https://plutostoreai.lovable.app`,
           ].filter(Boolean).join('\n');
           
@@ -553,22 +553,22 @@ const Subscriptions = () => {
           <ActionsMenu
             items={[
               {
-                label: 'Ø¥Ø±Ø³Ø§Ù„ Ø¹Ø¨Ø± ÙˆØ§ØªØ³Ø§Ø¨',
+                label: 'إرسال عبر واتساب',
                 icon: MessageCircle,
                 onClick: sendWhatsApp,
               },
               {
-                label: 'Ø¹Ø±Ø¶ Ø§Ù„ØªÙØ§ØµÙŠÙ„',
+                label: 'عرض التفاصيل',
                 icon: Eye,
                 onClick: () => console.log('View:', sub),
               },
               {
-                label: 'ØªØ¹Ø¯ÙŠÙ„',
+                label: 'تعديل',
                 icon: Edit,
                 onClick: () => console.log('Edit:', sub),
               },
               {
-                label: 'Ø­Ø°Ù',
+                label: 'حذف',
                 icon: Trash2,
                 onClick: () => openDeleteModal(sub),
                 variant: 'danger',
@@ -592,10 +592,10 @@ const Subscriptions = () => {
   return (
     <MainLayout>
       <Header
-        title="Ø§Ù„Ø§Ø´ØªØ±Ø§ÙƒØ§Øª"
-        subtitle={`${subscriptions.length} Ø§Ø´ØªØ±Ø§Ùƒ`}
+        title="الاشتراكات"
+        subtitle={`${subscriptions.length} اشتراك`}
         showAddButton
-        addButtonLabel="Ø¥Ø¶Ø§ÙØ© Ø§Ø´ØªØ±Ø§Ùƒ"
+        addButtonLabel="إضافة اشتراك"
         onAddClick={() => setIsModalOpen(true)}
       />
 
@@ -603,24 +603,24 @@ const Subscriptions = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Ù†Ø´Ø·</p>
+            <p className="text-sm text-muted-foreground">نشط</p>
             <p className="text-2xl font-bold text-success">{activeCount}</p>
           </div>
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Ù‚Ø±ÙŠØ¨ Ù…Ù† Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡</p>
+            <p className="text-sm text-muted-foreground">قريب من الانتهاء</p>
             <p className="text-2xl font-bold text-warning">{expiringCount}</p>
           </div>
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Ù…Ù†ØªÙ‡ÙŠ</p>
+            <p className="text-sm text-muted-foreground">منتهي</p>
             <p className="text-2xl font-bold text-destructive">{expiredCount}</p>
           </div>
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Ø¢Ø¬Ù„ / Ø¬Ø²Ø¦ÙŠ</p>
+            <p className="text-sm text-muted-foreground">آجل / جزئي</p>
             <p className="text-2xl font-bold text-warning">{deferredCount}</p>
           </div>
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¯ÙŠÙˆÙ†ÙŠØ©</p>
-            <p className="text-2xl font-bold text-destructive">{totalDebt.toLocaleString()} Ø±.Ø³</p>
+            <p className="text-sm text-muted-foreground">إجمالي المديونية</p>
+            <p className="text-2xl font-bold text-destructive">{totalDebt.toLocaleString()} ر.س</p>
           </div>
         </div>
 
@@ -628,11 +628,11 @@ const Subscriptions = () => {
         <div className="flex items-center gap-3 flex-wrap">
           <button className="btn-secondary">
             <Filter className="w-4 h-4" />
-            ØªØµÙÙŠØ©
+            تصفية
           </button>
           <button className="btn-ghost">
             <Download className="w-4 h-4" />
-            ØªØµØ¯ÙŠØ± CSV
+            تصدير CSV
           </button>
           <div className="flex items-center gap-2 mr-auto">
             <button 
@@ -643,7 +643,7 @@ const Subscriptions = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              Ø§Ù„ÙƒÙ„
+              الكل
             </button>
             <button 
               onClick={() => setFilterStatus('active')}
@@ -653,7 +653,7 @@ const Subscriptions = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              Ù†Ø´Ø·
+              نشط
             </button>
             <button 
               onClick={() => setFilterStatus('expiring_soon')}
@@ -663,7 +663,7 @@ const Subscriptions = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              Ù‚Ø±ÙŠØ¨ Ù…Ù† Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡
+              قريب من الانتهاء
             </button>
             <button 
               onClick={() => setFilterStatus('expired')}
@@ -673,7 +673,7 @@ const Subscriptions = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              Ù…Ù†ØªÙ‡ÙŠ
+              منتهي
             </button>
           </div>
         </div>
@@ -699,8 +699,8 @@ const Subscriptions = () => {
       {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={isDeleteModalOpen}
-        title="Ø­Ø°Ù Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ"
-        message="Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ù‡Ø°Ø§ Ø§Ù„Ø§Ø´ØªØ±Ø§ÙƒØŸ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡."
+        title="حذف الاشتراك"
+        message="هل أنت متأكد من حذف هذا الاشتراك؟ لا يمكن التراجع عن هذا الإجراء."
         itemName={selectedSubscription?.customerName}
         onClose={() => {
           setIsDeleteModalOpen(false);
