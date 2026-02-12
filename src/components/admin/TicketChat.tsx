@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Send, Paperclip, Mic, Image as ImageIcon, File as FileIcon,
-  Play, Pause, X, Download, CheckCircle2, Clock, XCircle
+  Send, Paperclip, Mic, File as FileIcon,
+  X, Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -26,7 +25,7 @@ interface TicketChatProps {
 }
 
 export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: TicketChatProps) {
-  const { messages, isLoading, sendMessage, uploadFile } = useTicketMessages(ticket.id);
+  const { messages, isLoading, sendMessage, uploadFile, markAsRead } = useTicketMessages(ticket.id);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -36,20 +35,33 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   const actualSenderId = senderId || (isAdmin ? 'admin' : ticket.customer_id);
+  const viewerType: 'customer' | 'admin' = isAdmin ? 'admin' : 'customer';
+  const isClosedForCustomer = !isAdmin && ticket.status === 'closed';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const latest = messages[messages.length - 1];
+    void markAsRead(viewerType, latest.created_at);
+  }, [messages, markAsRead, viewerType]);
+
   const handleSendMessage = async () => {
+    if (isClosedForCustomer) {
+      toast.error('لا يمكنك الإرسال لأن التذكرة مغلقة.');
+      return;
+    }
     if (!newMessage.trim()) return;
 
     setIsSending(true);
-    const success = await sendMessage(
-      actualSenderId,
-      isAdmin ? 'admin' : 'customer',
-      newMessage.trim()
-    );
+    const success = await sendMessage({
+      senderType: isAdmin ? 'admin' : 'customer',
+      senderId: actualSenderId,
+      messageType: 'text',
+      content: newMessage.trim(),
+    });
     if (success) {
       setNewMessage('');
     }
@@ -57,6 +69,10 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isClosedForCustomer) {
+      toast.error('لا يمكنك الإرسال لأن التذكرة مغلقة.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -64,14 +80,13 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
     const result = await uploadFile(file);
     if (result) {
       const messageType = file.type.startsWith('image/') ? 'image' : 'file';
-      await sendMessage(
-        actualSenderId,
-        isAdmin ? 'admin' : 'customer',
-        '',
+      await sendMessage({
+        senderType: isAdmin ? 'admin' : 'customer',
+        senderId: actualSenderId,
         messageType,
-        result.url,
-        result.name
-      );
+        fileUrl: result.url,
+        fileName: result.name,
+      });
     }
     setIsSending(false);
     if (fileInputRef.current) {
@@ -80,6 +95,10 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
   };
 
   const startRecording = async () => {
+    if (isClosedForCustomer) {
+      toast.error('لا يمكنك الإرسال لأن التذكرة مغلقة.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -97,7 +116,7 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
       setIsRecording(true);
     } catch (err) {
       console.error('Error accessing microphone:', err);
-      toast.error('لا يمكن الوصول للميكروفون');
+      toast.error('لا يمكن الوصول إلى الميكروفون');
     }
   };
 
@@ -109,20 +128,23 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
   };
 
   const sendVoiceMessage = async () => {
+    if (isClosedForCustomer) {
+      toast.error('لا يمكنك الإرسال لأن التذكرة مغلقة.');
+      return;
+    }
     if (!audioBlob) return;
 
     setIsSending(true);
     const file = new File([audioBlob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
     const result = await uploadFile(file);
     if (result) {
-      await sendMessage(
-        actualSenderId,
-        isAdmin ? 'admin' : 'customer',
-        '',
-        'voice',
-        result.url,
-        result.name
-      );
+      await sendMessage({
+        senderType: isAdmin ? 'admin' : 'customer',
+        senderId: actualSenderId,
+        messageType: 'voice',
+        fileUrl: result.url,
+        fileName: result.name,
+      });
     }
     setAudioBlob(null);
     setIsSending(false);
@@ -136,6 +158,9 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
     const isOwnMessage = isAdmin
       ? msg.sender_type === 'admin'
       : msg.sender_type === 'customer';
+    const senderName = msg.sender_type === 'admin'
+      ? 'الإدارة'
+      : (ticket.customer?.name || 'العميل');
 
     return (
       <div
@@ -149,6 +174,10 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
               : 'bg-muted rounded-bl-sm'
           }`}
         >
+          <p className={`text-[11px] mb-1 font-medium ${isOwnMessage ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+            {senderName}
+          </p>
+
           {msg.message_type === 'text' && (
             <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
           )}
@@ -205,7 +234,6 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
 
   return (
     <div className="flex flex-col h-[60vh]">
-      {/* Header with status */}
       {isAdmin && onStatusChange && (
         <div className="px-4 py-2 border-b bg-muted/50 flex items-center justify-between">
           <div>
@@ -228,7 +256,6 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
         </div>
       )}
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -244,11 +271,10 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Voice recording preview */}
       {audioBlob && (
         <div className="px-4 py-2 border-t bg-muted/50 flex items-center gap-2">
           <audio controls src={URL.createObjectURL(audioBlob)} className="flex-1 h-10" />
-          <Button size="sm" onClick={sendVoiceMessage} disabled={isSending}>
+          <Button size="sm" onClick={sendVoiceMessage} disabled={isSending || isClosedForCustomer}>
             <Send className="w-4 h-4" />
           </Button>
           <Button size="sm" variant="ghost" onClick={cancelVoice}>
@@ -257,22 +283,26 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
         </div>
       )}
 
-      {/* Input */}
       <div className="p-4 border-t">
+        {isClosedForCustomer && (
+          <p className="text-xs text-muted-foreground mb-2">
+            تم إغلاق هذه التذكرة بواسطة الإدارة. يمكنك عرض الرسائل فقط.
+          </p>
+        )}
         <div className="flex items-center gap-2">
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileUpload}
             className="hidden"
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+            accept="image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
           />
-          
+
           <Button
             variant="ghost"
             size="icon"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isSending}
+            disabled={isSending || isClosedForCustomer}
           >
             <Paperclip className="w-5 h-5" />
           </Button>
@@ -282,7 +312,7 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
             size="icon"
             onClick={isRecording ? stopRecording : startRecording}
             className={isRecording ? 'text-destructive animate-pulse' : ''}
-            disabled={isSending}
+            disabled={isSending || isClosedForCustomer}
           >
             <Mic className="w-5 h-5" />
           </Button>
@@ -292,13 +322,19 @@ export function TicketChat({ ticket, isAdmin, senderId, onStatusChange }: Ticket
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="اكتب رسالتك..."
             className="flex-1"
-            onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void handleSendMessage();
+              }
+            }}
             disabled={isSending || isRecording}
+            readOnly={isClosedForCustomer}
           />
 
           <Button
             onClick={handleSendMessage}
-            disabled={!newMessage.trim() || isSending}
+            disabled={!newMessage.trim() || isSending || isClosedForCustomer}
           >
             <Send className="w-4 h-4" />
           </Button>

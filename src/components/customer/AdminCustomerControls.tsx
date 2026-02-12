@@ -19,6 +19,8 @@ import {
 import { toast } from 'sonner';
 import { getCurrencySymbol } from '@/types/currency';
 import { CUSTOMER_ACCOUNTS_KEY, LocalCustomerAccount } from '@/hooks/useCustomerPassword';
+import { updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
+import { addCustomerActivity } from '@/lib/customerActivityLog';
 
 interface Subscription {
   id: string;
@@ -179,6 +181,19 @@ export function AdminCustomerControls({
 
       const ok = adjustAccountBalance(selectedCurrency, newBalance);
       if (!ok) throw new Error('account_not_found');
+      addCustomerActivity({
+        customerId,
+        type: adjustmentType === 'add' ? 'balance_add' : adjustmentType === 'subtract' ? 'balance_subtract' : 'balance_set',
+        title:
+          adjustmentType === 'add'
+            ? 'تمت إضافة رصيد'
+            : adjustmentType === 'subtract'
+            ? 'تم خصم رصيد'
+            : 'تم تعيين الرصيد',
+        description: `الرصيد الجديد: ${newBalance.toLocaleString()} ${selectedCurrency}`,
+        amount,
+        currency: selectedCurrency,
+      });
 
       toast.success(`تم تعديل رصيد ${getCurrencySymbol(selectedCurrency)} بنجاح`);
       setActiveModal(null);
@@ -244,6 +259,13 @@ export function AdminCustomerControls({
   const handleResetStats = async () => {
     setIsLoading(true);
     try {
+      await updateCustomerAccountRecord(customerId, {
+        balance_sar: 0,
+        balance_yer: 0,
+        balance_usd: 0,
+        balance: 0,
+      } as any);
+
       adjustAccountBalance('SAR', 0);
       adjustAccountBalance('YER', 0);
       adjustAccountBalance('USD', 0);
@@ -252,13 +274,49 @@ export function AdminCustomerControls({
       try {
         const raw = localStorage.getItem('app_subscriptions');
         const parsed = raw ? JSON.parse(raw) : [];
+        let deletedSubscriptionIds: string[] = [];
         if (Array.isArray(parsed)) {
+          deletedSubscriptionIds = parsed
+            .filter((s: any) => String(s?.customerId || '') === customerId)
+            .map((s: any) => String(s?.id || ''))
+            .filter((id: string) => id.length > 0);
+
           const updated = parsed.filter((s: any) => String(s?.customerId || '') !== customerId);
           localStorage.setItem('app_subscriptions', JSON.stringify(updated));
+        }
+
+        // Delete related invoices for this customer/subscriptions
+        const rawInvoices = localStorage.getItem('app_invoices');
+        const parsedInvoices = rawInvoices ? JSON.parse(rawInvoices) : [];
+        if (Array.isArray(parsedInvoices)) {
+          const updatedInvoices = parsedInvoices.filter((inv: any) => {
+            const byCustomer = String(inv?.customerId || '') === customerId;
+            const bySubscription = deletedSubscriptionIds.includes(String(inv?.subscriptionId || ''));
+            return !byCustomer && !bySubscription;
+          });
+          localStorage.setItem('app_invoices', JSON.stringify(updatedInvoices));
+        }
+
+        // Delete related payments for this customer/subscriptions
+        const rawPayments = localStorage.getItem('app_payments');
+        const parsedPayments = rawPayments ? JSON.parse(rawPayments) : [];
+        if (Array.isArray(parsedPayments)) {
+          const updatedPayments = parsedPayments.filter((pay: any) => {
+            const byCustomerName = String(pay?.customerName || '') === customerName;
+            const bySubscription = deletedSubscriptionIds.includes(String(pay?.invoiceId || ''));
+            return !byCustomerName && !bySubscription;
+          });
+          localStorage.setItem('app_payments', JSON.stringify(updatedPayments));
         }
       } catch {
         // ignore
       }
+      addCustomerActivity({
+        customerId,
+        type: 'reset',
+        title: 'تم تصفير بيانات الحساب',
+        description: 'تمت إزالة الاشتراكات والفواتير والمدفوعات وتصفير الأرصدة',
+      });
 
       toast.success('تم تصفير جميع البيانات بنجاح');
       setActiveModal(null);

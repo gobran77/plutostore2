@@ -10,7 +10,7 @@ This project can run online across devices after:
 
 1. Create a Firebase project in console.
 2. Enable Firestore Database (production or test mode).
-3. Create collection: `customer_accounts`.
+3. Create collections: `customer_accounts` and `app_state`.
 4. From project settings, copy web app config values.
 
 ## 2) Environment Variables
@@ -50,6 +50,9 @@ service cloud.firestore {
     match /customer_accounts/{document=**} {
       allow read, write: if true;
     }
+    match /app_state/{document=**} {
+      allow read, write: if true;
+    }
   }
 }
 ```
@@ -83,5 +86,6 @@ After deployment, open your Vercel URL from any phone.
 
 ## Current Scope
 
-In this migration, customer accounts/auth flow are cloud-backed.
-Other modules still use localStorage and can be migrated next.
+Customer accounts/auth are cloud-backed.
+All app data keys prefixed with `app_` are also synced to Firestore `app_state`.
+Session keys (`admin_session`, `customer_session`) stay local by design.

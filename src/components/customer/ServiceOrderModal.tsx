@@ -19,11 +19,14 @@ import {
   AlertTriangle,
   Send,
   Mail,
-  User
+  User,
+  CalendarDays
 } from 'lucide-react';
 import { getCurrencySymbol } from '@/types/currency';
 import { toast } from 'sonner';
 import { useServiceRequests } from '@/hooks/useServiceRequests';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 interface ServicePricing {
   periodDays: number;
@@ -102,6 +105,13 @@ export function ServiceOrderModal({
   
   const selectedCurrencyBalance = selected ? getBalanceForCurrency(selected.currency) : 0;
   const canAfford = selected && selectedCurrencyBalance >= selected.sellPrice;
+  const subscriptionStartDate = new Date();
+  const subscriptionEndDate = new Date();
+  if (selected) {
+    subscriptionEndDate.setDate(
+      subscriptionEndDate.getDate() + Math.max(1, Number(selected.periodDays || 0))
+    );
+  }
   
   // Validate email for private services
   const isValidEmail = (email: string) => {
@@ -161,6 +171,8 @@ export function ServiceOrderModal({
       (isPrivateService && customerEmail ? `📧 *إيميل التفعيل:* ${customerEmail}\n` : '') +
       `\n📦 *الخدمة:* ${service.name}\n` +
       `📅 *المدة:* ${selected.periodName}\n` +
+      `🗓️ *بداية الاشتراك:* ${format(subscriptionStartDate, 'dd MMM yyyy', { locale: ar })}\n` +
+      `⏳ *نهاية الاشتراك:* ${format(subscriptionEndDate, 'dd MMM yyyy', { locale: ar })}\n` +
       `💰 *السعر:* ${selected.sellPrice} ${getCurrencySymbol(selected.currency)}\n` +
       `🏷️ *النوع:* ${service.default_type === 'shared' ? 'حساب مشترك' : 'حساب خاص'}\n\n` +
       `💳 *الرصيد الحالي:* ${customer.balance} ${customer.currency}\n` +
@@ -310,6 +322,33 @@ export function ServiceOrderModal({
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Order Confirmation Summary */}
+          {selected && (
+            <div className="rounded-lg p-3 border bg-primary/5 space-y-2">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">تأكيد الطلب</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-md bg-background p-2">
+                  <p className="text-xs text-muted-foreground">بداية الاشتراك</p>
+                  <p className="font-medium">
+                    {format(subscriptionStartDate, 'dd MMM yyyy', { locale: ar })}
+                  </p>
+                </div>
+                <div className="rounded-md bg-background p-2">
+                  <p className="text-xs text-muted-foreground">نهاية الاشتراك</p>
+                  <p className="font-medium text-primary">
+                    {format(subscriptionEndDate, 'dd MMM yyyy', { locale: ar })}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                يتحدث تاريخ الانتهاء تلقائيا عند تغيير المدة.
+              </p>
             </div>
           )}
 

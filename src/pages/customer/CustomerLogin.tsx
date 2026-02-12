@@ -15,6 +15,11 @@ interface PendingCustomer {
   name: string;
   whatsapp_number: string;
   balance: number;
+  balances: {
+    balance_sar: number;
+    balance_yer: number;
+    balance_usd: number;
+  };
   currency: string;
   activation_code: string;
   stored_email: string;
@@ -235,6 +240,11 @@ export default function CustomerLogin() {
             name: customer.name,
             whatsapp_number: customer.whatsapp_number,
             balance: customer.balance || 0,
+            balances: {
+              balance_sar: Number((customer as any)?.balance_sar || 0),
+              balance_yer: Number((customer as any)?.balance_yer || 0),
+              balance_usd: Number((customer as any)?.balance_usd || 0),
+            },
             currency: customer.currency || 'SAR',
             activation_code: customer.activation_code || '',
           })
@@ -250,6 +260,11 @@ export default function CustomerLogin() {
         name: customer.name,
         whatsapp_number: customer.whatsapp_number,
         balance: customer.balance || 0,
+        balances: {
+          balance_sar: Number((customer as any)?.balance_sar || 0),
+          balance_yer: Number((customer as any)?.balance_yer || 0),
+          balance_usd: Number((customer as any)?.balance_usd || 0),
+        },
         currency: customer.currency || 'SAR',
         activation_code: '',
         stored_email: storedEmail,
@@ -321,6 +336,7 @@ export default function CustomerLogin() {
           name: pendingCustomer.name,
           whatsapp_number: pendingCustomer.whatsapp_number,
           balance: pendingCustomer.balance,
+          balances: pendingCustomer.balances,
           currency: pendingCustomer.currency,
           activation_code: pendingCustomer.activation_code,
         })
@@ -379,8 +395,14 @@ export default function CustomerLogin() {
         name: customer.name,
         whatsapp_number: customer.whatsapp_number,
         balance: customer.balance || 0,
+        balances: {
+          balance_sar: Number((customer as any)?.balance_sar || 0),
+          balance_yer: Number((customer as any)?.balance_yer || 0),
+          balance_usd: Number((customer as any)?.balance_usd || 0),
+        },
         currency: customer.currency || 'SAR',
         activation_code: resetCode,
+        stored_email: email.toLowerCase(),
       });
       setStep('forgotReset');
       toast.success('تم إرسال كود إعادة التعيين إلى البريد الإلكتروني');

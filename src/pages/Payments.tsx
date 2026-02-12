@@ -14,10 +14,20 @@ import { loadPayments, savePayments, updatePaymentInStorage, deletePaymentFromSt
 import { addToBalance, subtractFromBalance } from '@/types/currency';
 
 const PAYMENT_METHODS_STORAGE_KEY = 'app_payment_methods';
+const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
 
 // Extended Payment type with methodName
 interface ExtendedPayment extends Payment {
   methodName?: string;
+}
+
+interface DeferredDebtItem {
+  id: string;
+  customerName: string;
+  serviceName: string;
+  remaining: number;
+  currency: string;
+  dueDate?: Date;
 }
 
 const getMethodIcon = (method: PaymentMethod | string) => {
@@ -53,12 +63,53 @@ const Payments = () => {
   const [isMethodsModalOpen, setIsMethodsModalOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<ExtendedPayment | null>(null);
   const [filterMethod, setFilterMethod] = useState<FilterMethod>('all');
+  const [deferredDebts, setDeferredDebts] = useState<DeferredDebtItem[]>([]);
+
+  const loadDeferredDebts = () => {
+    try {
+      const raw = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const list = (Array.isArray(parsed) ? parsed : [])
+        .map((s: any) => {
+          const totalPrice = Number(s?.totalPrice || 0);
+          const paidAmount = Number(s?.paidAmount || 0);
+          const remaining = Math.max(0, totalPrice - paidAmount);
+          const paymentStatus = String(s?.paymentStatus || 'paid');
+          const services = Array.isArray(s?.services) ? s.services : [];
+          const serviceName = services.length > 0
+            ? String(services[0]?.serviceName || 'خدمة')
+            : String(s?.service_name || 'خدمة');
+
+          return {
+            id: String(s?.id || ''),
+            customerName: String(s?.customerName || ''),
+            serviceName,
+            remaining,
+            currency: String(s?.currency || 'SAR'),
+            dueDate: s?.dueDate ? new Date(s.dueDate) : undefined,
+            paymentStatus,
+          };
+        })
+        .filter((s: any) => (s.paymentStatus === 'deferred' || s.paymentStatus === 'partial') && s.remaining > 0)
+        .sort((a: any, b: any) => {
+          const at = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+          const bt = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+          return at - bt;
+        }) as DeferredDebtItem[];
+
+      setDeferredDebts(list);
+    } catch (error) {
+      console.error('Error loading deferred debts:', error);
+      setDeferredDebts([]);
+    }
+  };
 
   // Load payments and payment methods from localStorage on mount
   useEffect(() => {
     // Load payments
     const loadedPayments = loadPayments() as ExtendedPayment[];
     setPayments(loadedPayments);
+    loadDeferredDebts();
 
     // Load payment methods
     const savedMethods = localStorage.getItem(PAYMENT_METHODS_STORAGE_KEY);
@@ -98,6 +149,7 @@ const Payments = () => {
     
     // Add to currency balance
     addToBalance(paymentData.currency, paymentData.amount);
+    loadDeferredDebts();
     
     toast.success('تم تسجيل الدفعة بنجاح');
   };
@@ -119,6 +171,7 @@ const Payments = () => {
       const updated = payments.filter(p => p.id !== selectedPayment.id);
       setPayments(updated);
       deletePaymentFromStorage(selectedPayment.id);
+      loadDeferredDebts();
       toast.success('تم حذف الدفعة بنجاح');
       setIsDeleteModalOpen(false);
       setSelectedPayment(null);
@@ -271,6 +324,30 @@ const Payments = () => {
       />
 
       <div className="p-6 space-y-6 animate-fade-in">
+        {deferredDebts.length > 0 && (
+          <div className="bg-card rounded-xl p-4 border border-border">
+            <h3 className="font-semibold text-foreground mb-3">العملاء عليهم مدفوعات آجلة</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {deferredDebts.slice(0, 8).map((debt) => (
+                <div key={debt.id} className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-foreground">{debt.customerName}</p>
+                    <p className="font-bold text-destructive">
+                      {debt.remaining.toLocaleString()} {debt.currency}
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{debt.serviceName}</p>
+                  {debt.dueDate && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      الاستحقاق: {debt.dueDate.toLocaleDateString('ar-SA')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-card rounded-xl p-4 border border-border">

@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 const SERVICES_STORAGE_KEY = 'app_services';
 const CUSTOMERS_STORAGE_KEY = 'app_customers';
 const PAYMENT_METHODS_KEY = 'app_payment_methods';
+const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
 
 const Services = () => {
   const [services, setServices] = useState<Service[]>([]);
@@ -253,6 +254,48 @@ const Services = () => {
     toast.success('تمت إضافة الإيميل بنجاح');
   };
 
+  const syncLoginCredentialsToSubscriptions = (
+    slotId: string,
+    oldEmail: string | null | undefined,
+    email: string,
+    password: string
+  ) => {
+    try {
+      const raw = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return 0;
+
+      const now = new Date().toISOString();
+      let changes = 0;
+
+      const oldNormalized = String(oldEmail || '').trim().toLowerCase();
+      const updatedSubs = parsed.map((sub: any) => {
+        const currentSlotId = String(sub?.slotId || sub?.slot_id || '');
+        const currentLoginEmail = String(sub?.loginEmail || '').trim().toLowerCase();
+        const matchesBySlot = Boolean(currentSlotId) && currentSlotId === slotId;
+        const matchesByEmail = Boolean(oldNormalized) && currentLoginEmail === oldNormalized;
+        if (!matchesBySlot && !matchesByEmail) return sub;
+
+        changes += 1;
+        return {
+          ...sub,
+          loginEmail: email,
+          loginPassword: password,
+          loginUpdatedAt: now,
+        };
+      });
+
+      if (changes > 0) {
+        localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(updatedSubs));
+      }
+
+      return changes;
+    } catch {
+      return 0;
+    }
+  };
+
   const handleUpdateEmailCredentials = async () => {
     if (!selectedService || !selectedAccount || !selectedEmail) return;
     if (!editEmailForm.email.trim()) {
@@ -290,6 +333,13 @@ const Services = () => {
         if (updatedEmail) setSelectedEmail(updatedEmail);
       }
     }
+
+    syncLoginCredentialsToSubscriptions(
+      selectedEmail.id,
+      selectedEmail.email,
+      updated.email,
+      updated.password || ''
+    );
 
     setIsEditEmailModalOpen(false);
     toast.success('تم تحديث بيانات الدخول');

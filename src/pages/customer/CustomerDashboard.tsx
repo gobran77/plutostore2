@@ -17,7 +17,9 @@ import {
   MessageCircle,
   Package,
   HeadphonesIcon,
-  KeyRound
+  KeyRound,
+  Bell,
+  FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { differenceInDays, format } from 'date-fns';
@@ -26,6 +28,8 @@ import { AdminCustomerControls } from '@/components/customer/AdminCustomerContro
 import { ServicesSection } from '@/components/customer/ServicesSection';
 import { CustomerTickets } from '@/components/customer/CustomerTickets';
 import { getCurrencySymbol } from '@/types/currency';
+import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
+import { getCustomerActivity, type CustomerActivityItem } from '@/lib/customerActivityLog';
 
 interface CustomerBalances {
   balance_sar: number;
@@ -64,19 +68,74 @@ interface Subscription {
   } | null;
 }
 
+interface PaymentMethodInfo {
+  id: string;
+  name: string;
+  type: 'bank' | 'wallet' | 'card' | 'cash';
+  details?: string;
+  active: boolean;
+}
+
+interface CustomerPaymentRecord {
+  id: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  paidAt: string;
+  methodName?: string;
+}
+
 export default function CustomerDashboard() {
   const [customer, setCustomer] = useState<CustomerSession | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'home' | 'subscriptions' | 'credentials' | 'services' | 'tickets'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'subscriptions' | 'credentials' | 'services' | 'report' | 'tickets'>('home');
   const [isAdmin, setIsAdmin] = useState(false);
   const [credentialsUpdated, setCredentialsUpdated] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodInfo[]>([]);
+  const [accountActivities, setAccountActivities] = useState<CustomerActivityItem[]>([]);
+  const [customerPayments, setCustomerPayments] = useState<CustomerPaymentRecord[]>([]);
   const slotIdsRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
 
   // Admin WhatsApp number
   const adminWhatsApp = '201030638992';
   const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
+  const PAYMENT_METHODS_STORAGE_KEY = 'app_payment_methods';
+  const PAYMENTS_STORAGE_KEY = 'app_payments';
+  const CUSTOMER_ACTIVITY_KEY = 'app_customer_activity';
+
+  const getOutstandingDebtByCurrency = (customerId: string): CustomerBalances => {
+    try {
+      const raw = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) {
+        return { balance_sar: 0, balance_yer: 0, balance_usd: 0 };
+      }
+
+      const debt = { balance_sar: 0, balance_yer: 0, balance_usd: 0 };
+      parsed
+        .filter((s: any) => String(s?.customerId || '') === String(customerId))
+        .forEach((s: any) => {
+          const paymentStatus = String(s?.paymentStatus || 'paid');
+          if (paymentStatus === 'paid') return;
+
+          const totalPrice = Number(s?.totalPrice || 0);
+          const paidAmount = Number(s?.paidAmount || 0);
+          const remaining = Math.max(0, totalPrice - paidAmount);
+          if (remaining <= 0) return;
+
+          const currency = String(s?.currency || '').toUpperCase();
+          if (currency === 'SAR') debt.balance_sar += remaining;
+          if (currency === 'YER') debt.balance_yer += remaining;
+          if (currency === 'USD') debt.balance_usd += remaining;
+        });
+
+      return debt;
+    } catch {
+      return { balance_sar: 0, balance_yer: 0, balance_usd: 0 };
+    }
+  };
 
   const loadLocalSubscriptionsForCustomer = (customerId: string): Subscription[] => {
     try {
@@ -124,6 +183,49 @@ export default function CustomerDashboard() {
     }
   };
 
+  const loadPaymentMethods = () => {
+    try {
+      const raw = localStorage.getItem(PAYMENT_METHODS_STORAGE_KEY);
+      if (!raw) {
+        setPaymentMethods([]);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      setPaymentMethods(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setPaymentMethods([]);
+    }
+  };
+
+  const loadCustomerPayments = (customerId: string, customerName: string) => {
+    try {
+      const raw = localStorage.getItem(PAYMENTS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const list = (Array.isArray(parsed) ? parsed : [])
+        .filter((p: any) => {
+          const byId = String(p?.customerId || '') === String(customerId);
+          const byName = String(p?.customerName || '') === String(customerName || '');
+          return byId || byName;
+        })
+        .map((p: any) => ({
+          id: String(p?.id || ''),
+          invoiceNumber: String(p?.invoiceNumber || ''),
+          amount: Number(p?.amount || 0),
+          currency: String(p?.currency || 'SAR'),
+          paidAt: p?.paidAt ? new Date(p.paidAt).toISOString() : new Date().toISOString(),
+          methodName: p?.methodName ? String(p.methodName) : String(p?.method || ''),
+        }))
+        .sort((a: CustomerPaymentRecord, b: CustomerPaymentRecord) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
+      setCustomerPayments(list);
+    } catch {
+      setCustomerPayments([]);
+    }
+  };
+
+  const loadAccountActivities = (customerId: string) => {
+    setAccountActivities(getCustomerActivity(customerId, 100));
+  };
+
   useEffect(() => {
     // Check for admin session first
     const adminSession = localStorage.getItem('admin_session');
@@ -148,10 +250,54 @@ export default function CustomerDashboard() {
     setCustomer(normalized);
     fetchSubscriptions(normalized.id);
     fetchUpdatedBalance(normalized.id);
+    loadPaymentMethods();
+    loadCustomerPayments(normalized.id, normalized.name);
+    loadAccountActivities(normalized.id);
   }, [navigate]);
 
-  const fetchUpdatedBalance = async (_customerId: string) => {
-    // Keep balances from local session only.
+  const fetchUpdatedBalance = async (customerId: string) => {
+    try {
+      const accounts = await getCustomerAccounts();
+      const account = accounts.find((a) => String(a.id) === String(customerId));
+      if (!account) return;
+
+      const storedBalances: CustomerBalances = {
+        balance_sar: Number((account as any)?.balance_sar || 0),
+        balance_yer: Number((account as any)?.balance_yer || 0),
+        balance_usd: Number((account as any)?.balance_usd || 0),
+      };
+      const debt = getOutstandingDebtByCurrency(customerId);
+
+      // Keep positive credit as-is. Normalize stale negative debt to actual outstanding debt.
+      const nextBalances: CustomerBalances = {
+        balance_sar: storedBalances.balance_sar < 0 ? -debt.balance_sar : storedBalances.balance_sar,
+        balance_yer: storedBalances.balance_yer < 0 ? -debt.balance_yer : storedBalances.balance_yer,
+        balance_usd: storedBalances.balance_usd < 0 ? -debt.balance_usd : storedBalances.balance_usd,
+      };
+
+      const shouldPatchAccount =
+        nextBalances.balance_sar !== storedBalances.balance_sar ||
+        nextBalances.balance_yer !== storedBalances.balance_yer ||
+        nextBalances.balance_usd !== storedBalances.balance_usd;
+
+      if (shouldPatchAccount) {
+        await updateCustomerAccountRecord(account.id, nextBalances as any);
+      }
+
+      setCustomer((prev) => {
+        if (!prev || String(prev.id) !== String(customerId)) return prev;
+        const next = {
+          ...prev,
+          balance: Number((account as any)?.balance || prev.balance || 0),
+          currency: String((account as any)?.currency || prev.currency || 'SAR'),
+          balances: nextBalances,
+        };
+        localStorage.setItem('customer_session', JSON.stringify(next));
+        return next;
+      });
+    } catch (error) {
+      console.error('Error fetching updated customer balance:', error);
+    }
   };
 
   const fetchSubscriptions = async (customerId: string) => {
@@ -176,8 +322,21 @@ export default function CustomerDashboard() {
     if (!customer?.id) return;
 
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== SUBSCRIPTIONS_STORAGE_KEY) return;
-      fetchSubscriptions(customer.id);
+      if (e.key === SUBSCRIPTIONS_STORAGE_KEY) {
+        fetchSubscriptions(customer.id);
+      }
+      if (e.key === 'app_customer_accounts') {
+        fetchUpdatedBalance(customer.id);
+      }
+      if (e.key === PAYMENT_METHODS_STORAGE_KEY) {
+        loadPaymentMethods();
+      }
+      if (e.key === PAYMENTS_STORAGE_KEY) {
+        loadCustomerPayments(customer.id, customer.name);
+      }
+      if (e.key === CUSTOMER_ACTIVITY_KEY) {
+        loadAccountActivities(customer.id);
+      }
     };
 
     window.addEventListener('storage', onStorage);
@@ -199,6 +358,9 @@ export default function CustomerDashboard() {
     if (customer) {
       fetchSubscriptions(customer.id);
       fetchUpdatedBalance(customer.id);
+      loadPaymentMethods();
+      loadCustomerPayments(customer.id, customer.name);
+      loadAccountActivities(customer.id);
     }
   };
 
@@ -443,7 +605,7 @@ export default function CustomerDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <Card 
             className="border-0 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
             onClick={handleRechargeRequest}
@@ -479,7 +641,122 @@ export default function CustomerDashboard() {
               <span className="text-xs font-medium">الخدمات</span>
             </CardContent>
           </Card>
+
+          <Card
+            className="border-0 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setActiveTab('report')}
+          >
+            <CardContent className="p-3 flex flex-col items-center text-center">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <span className="text-xs font-medium">تقرير الحساب</span>
+            </CardContent>
+          </Card>
         </div>
+
+        {activeTab === 'report' && (
+          <>
+            <Card className="border-0 shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-primary" />
+                  إشعارات الحساب
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {accountActivities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-2">لا توجد إشعارات حالياً</p>
+                ) : (
+                  accountActivities.slice(0, 10).map((item) => (
+                    <div key={item.id} className="p-3 rounded-lg bg-muted/40 border border-border">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium">{item.title}</p>
+                        {typeof item.amount === 'number' && item.amount > 0 && (
+                          <span className="text-xs font-semibold text-primary">
+                            {item.amount.toLocaleString()} {item.currency || ''}
+                          </span>
+                        )}
+                      </div>
+                      {item.description && (
+                        <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {format(new Date(item.createdAt), 'dd MMM yyyy - HH:mm', { locale: ar })}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  تقرير الحساب
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">إجمالي الاشتراكات</p>
+                    <p className="font-bold">{subscriptions.length}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">الخدمات النشطة</p>
+                    <p className="font-bold">{subscriptions.filter((s) => getDaysRemaining(s.end_date) > 0 && s.status !== 'cancelled').length}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">عمليات الدفع</p>
+                    <p className="font-bold">{customerPayments.length}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">أنواع الخدمات المشترك بها</p>
+                  {subscriptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">لا توجد خدمات مسجلة.</p>
+                  ) : (
+                    subscriptions.slice(0, 10).map((sub) => (
+                      <div key={sub.id} className="p-2 rounded-md border border-border text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{sub.service_name}</span>
+                          <span className="text-muted-foreground">{sub.price} {sub.currency}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          من {format(new Date(sub.start_date), 'dd MMM yyyy', { locale: ar })} إلى {format(new Date(sub.end_date), 'dd MMM yyyy', { locale: ar })}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">آخر المدفوعات</p>
+                  {customerPayments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">لا توجد مدفوعات مسجلة.</p>
+                  ) : (
+                    customerPayments.slice(0, 10).map((pay) => (
+                      <div key={pay.id} className="p-2 rounded-md border border-border text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{pay.invoiceNumber || 'دفعة'}</span>
+                          <span className="text-primary font-semibold">
+                            {pay.amount.toLocaleString()} {pay.currency}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(pay.paidAt), 'dd MMM yyyy - HH:mm', { locale: ar })}
+                          {pay.methodName ? ` • ${pay.methodName}` : ''}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         {/* Deferred/Partial Payment Alert */}
         {(() => {
@@ -497,6 +774,9 @@ export default function CustomerDashboard() {
           if (dueSubs.length === 0) return null;
 
           const top = dueSubs[0];
+          const activeSettlementMethods = paymentMethods.filter(
+            (m) => m.active && (m.type === 'bank' || m.type === 'wallet')
+          );
           return (
             <Card className="border-0 shadow-md overflow-hidden">
               <CardHeader className="pb-2">
@@ -529,6 +809,23 @@ export default function CustomerDashboard() {
                   <div className="text-sm">
                     <span className="text-muted-foreground">ملاحظة: </span>
                     <span className="font-medium">{top.s.payment_notes}</span>
+                  </div>
+                )}
+                {activeSettlementMethods.length > 0 && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">طرق السداد المتاحة: </span>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {activeSettlementMethods.map((method) => (
+                        <span
+                          key={method.id}
+                          className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+                        >
+                          {method.type === 'bank' ? 'بنك: ' : 'محفظة: '}
+                          {method.name}
+                          {method.details ? ` (${method.details})` : ''}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -739,7 +1036,7 @@ export default function CustomerDashboard() {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border py-2 px-3">
-        <div className="max-w-lg mx-auto grid grid-cols-5 gap-1">
+        <div className="max-w-lg mx-auto grid grid-cols-6 gap-1">
           <button
             onClick={() => setActiveTab('home')}
             className={`flex flex-1 min-w-[64px] flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
@@ -775,6 +1072,15 @@ export default function CustomerDashboard() {
           >
             <Package className="w-5 h-5" />
             <span className="text-xs">الخدمات</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('report')}
+            className={`flex flex-1 min-w-[64px] flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
+              activeTab === 'report' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-xs">التقرير</span>
           </button>
           <button
             onClick={() => setActiveTab('tickets')}

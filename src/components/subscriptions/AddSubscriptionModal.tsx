@@ -60,6 +60,36 @@ const deferredDays = [
   { value: 30, label: 'شهر' },
 ];
 
+const formatDateInput = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateInput = (value: string): Date | null => {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const buildEndDateFromStartAndDuration = (startValue: string, durationDays: number): string => {
+  const start = parseDateInput(startValue) || new Date();
+  const end = new Date(start);
+  end.setDate(end.getDate() + Math.max(1, Number(durationDays || 1)));
+  return formatDateInput(end);
+};
+
+const buildDurationFromDates = (startValue: string, endValue: string): number => {
+  const start = parseDateInput(startValue);
+  const end = parseDateInput(endValue);
+  if (!start || !end) return 1;
+  const diffMs = end.getTime() - start.getTime();
+  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+  return Math.max(1, diffDays);
+};
+
 const getMethodIcon = (type: string) => {
   switch (type) {
     case 'bank': return Building2;
@@ -91,6 +121,10 @@ export const AddSubscriptionModal = ({
     paymentNotes: '',
     subscriptionType: 'private',
   });
+  const [startDateInput, setStartDateInput] = useState<string>(formatDateInput(new Date()));
+  const [endDateInput, setEndDateInput] = useState<string>(
+    buildEndDateFromStartAndDuration(formatDateInput(new Date()), 30)
+  );
 
   // Shared subscription state
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
@@ -119,6 +153,7 @@ export const AddSubscriptionModal = ({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
+      const today = formatDateInput(new Date());
       setSelectedCustomer(null);
       setSelectedPaymentMethod(null);
       setFormData({
@@ -132,6 +167,8 @@ export const AddSubscriptionModal = ({
         paymentNotes: '',
         subscriptionType: 'private',
       });
+      setStartDateInput(today);
+      setEndDateInput(buildEndDateFromStartAndDuration(today, 30));
       setSubscriptionServices([{ id: '1', serviceName: '', price: 0, cost: 0 }]);
       setSelectedLegacySharedServiceId('');
       setSelectedSlotId('');
@@ -209,11 +246,15 @@ export const AddSubscriptionModal = ({
     }));
   }, [formData.duration, services]);
 
+  useEffect(() => {
+    setEndDateInput(buildEndDateFromStartAndDuration(startDateInput, formData.duration));
+  }, [startDateInput, formData.duration]);
+
   // Early return AFTER all hooks
   if (!isOpen) return null;
 
-  const startDate = new Date();
-  const endDate = new Date(startDate.getTime() + formData.duration * 24 * 60 * 60 * 1000);
+  const startDate = parseDateInput(startDateInput) || new Date();
+  const endDate = parseDateInput(endDateInput) || new Date(startDate);
   const dueDate = formData.paymentStatus === 'deferred' 
     ? new Date(startDate.getTime() + formData.deferredDays * 24 * 60 * 60 * 1000)
     : undefined;
@@ -414,6 +455,9 @@ export const AddSubscriptionModal = ({
                 onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
                 className="input-field"
               >
+                {!durations.some((d) => d.value === formData.duration) && (
+                  <option value={formData.duration}>{formData.duration} يوم</option>
+                )}
                 {durations.map(d => (
                   <option key={d.value} value={d.value}>{d.label}</option>
                 ))}
@@ -853,7 +897,7 @@ export const AddSubscriptionModal = ({
           </div>
 
           {/* Date Preview */}
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+          <div className="hidden">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">تاريخ البداية:</span>
               <span className="font-medium text-foreground">{startDate.toLocaleDateString('ar-SA')}</span>
@@ -861,6 +905,39 @@ export const AddSubscriptionModal = ({
             <div className="flex justify-between text-sm mt-2">
               <span className="text-muted-foreground">تاريخ الانتهاء:</span>
               <span className="font-medium text-foreground">{endDate.toLocaleDateString('ar-SA')}</span>
+            </div>
+          </div>
+
+          {/* Editable Dates */}
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">تاريخ البداية:</label>
+                <input
+                  type="date"
+                  value={startDateInput}
+                  onChange={(e) => setStartDateInput(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">تاريخ الانتهاء:</label>
+                <input
+                  type="date"
+                  value={endDateInput}
+                  min={startDateInput}
+                  onChange={(e) => {
+                    const nextEnd = e.target.value;
+                    setEndDateInput(nextEnd);
+                    const nextDuration = buildDurationFromDates(startDateInput, nextEnd);
+                    setFormData((prev) => ({ ...prev, duration: nextDuration }));
+                  }}
+                  className="input-field"
+                />
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground">
+              تغيير تاريخ الانتهاء يحدّث مدة الاشتراك تلقائيا.
             </div>
           </div>
 
