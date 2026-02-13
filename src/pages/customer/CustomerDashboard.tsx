@@ -45,6 +45,7 @@ interface CustomerSession {
   currency: string;
   balances: CustomerBalances;
   activation_code?: string;
+  impersonated_by_admin?: boolean;
 }
 
 interface Subscription {
@@ -227,12 +228,6 @@ export default function CustomerDashboard() {
   };
 
   useEffect(() => {
-    // Check for admin session first
-    const adminSession = localStorage.getItem('admin_session');
-    if (adminSession) {
-      setIsAdmin(true);
-    }
-
     const session = localStorage.getItem('customer_session');
     if (!session) {
       navigate('/customer');
@@ -240,6 +235,10 @@ export default function CustomerDashboard() {
     }
 
     const customerData = JSON.parse(session) as CustomerSession;
+    const adminSession = localStorage.getItem('admin_session');
+    const isAdminImpersonation = Boolean(customerData?.impersonated_by_admin) && Boolean(adminSession);
+    setIsAdmin(isAdminImpersonation);
+
     // Ensure balances object exists (older sessions won't have it).
     const balances: CustomerBalances = customerData.balances || {
       balance_sar: 0,

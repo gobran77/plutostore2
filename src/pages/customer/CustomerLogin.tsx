@@ -26,6 +26,21 @@ interface PendingCustomer {
   pending_email?: string;
 }
 
+type CustomerSessionPayload = {
+  id: string;
+  name: string;
+  whatsapp_number: string;
+  balance: number;
+  balances: {
+    balance_sar: number;
+    balance_yer: number;
+    balance_usd: number;
+  };
+  currency: string;
+  activation_code: string;
+  impersonated_by_admin?: boolean;
+};
+
 const ADMIN_PHONE = '201030638992';
 const ADMIN_CODE = '@737Gobran737@';
 
@@ -100,6 +115,18 @@ export default function CustomerLogin() {
     );
     toast.success('تم تسجيل دخول الأدمن');
     navigate('/');
+  };
+
+  const openCustomerSession = (payload: CustomerSessionPayload) => {
+    // Security: a real customer login must never inherit a stale admin session.
+    localStorage.removeItem('admin_session');
+    localStorage.setItem(
+      'customer_session',
+      JSON.stringify({
+        ...payload,
+        impersonated_by_admin: false,
+      })
+    );
   };
 
   const sendActivationCodeToEmail = async (
@@ -233,22 +260,19 @@ export default function CustomerLogin() {
 
       // Customer / merchant: OTP only on first login.
       if ((customer as any).is_activated) {
-        localStorage.setItem(
-          'customer_session',
-          JSON.stringify({
-            id: customer.id,
-            name: customer.name,
-            whatsapp_number: customer.whatsapp_number,
-            balance: customer.balance || 0,
-            balances: {
-              balance_sar: Number((customer as any)?.balance_sar || 0),
-              balance_yer: Number((customer as any)?.balance_yer || 0),
-              balance_usd: Number((customer as any)?.balance_usd || 0),
-            },
-            currency: customer.currency || 'SAR',
-            activation_code: customer.activation_code || '',
-          })
-        );
+        openCustomerSession({
+          id: customer.id,
+          name: customer.name,
+          whatsapp_number: customer.whatsapp_number,
+          balance: customer.balance || 0,
+          balances: {
+            balance_sar: Number((customer as any)?.balance_sar || 0),
+            balance_yer: Number((customer as any)?.balance_yer || 0),
+            balance_usd: Number((customer as any)?.balance_usd || 0),
+          },
+          currency: customer.currency || 'SAR',
+          activation_code: customer.activation_code || '',
+        });
         toast.success(`مرحباً ${customer.name}`);
         navigate('/customer/dashboard');
         return;
@@ -329,18 +353,15 @@ export default function CustomerLogin() {
       }
       await updateCustomerAccountRecord(pendingCustomer.id, patch);
 
-      localStorage.setItem(
-        'customer_session',
-        JSON.stringify({
-          id: pendingCustomer.id,
-          name: pendingCustomer.name,
-          whatsapp_number: pendingCustomer.whatsapp_number,
-          balance: pendingCustomer.balance,
-          balances: pendingCustomer.balances,
-          currency: pendingCustomer.currency,
-          activation_code: pendingCustomer.activation_code,
-        })
-      );
+      openCustomerSession({
+        id: pendingCustomer.id,
+        name: pendingCustomer.name,
+        whatsapp_number: pendingCustomer.whatsapp_number,
+        balance: pendingCustomer.balance,
+        balances: pendingCustomer.balances,
+        currency: pendingCustomer.currency,
+        activation_code: pendingCustomer.activation_code,
+      });
 
       toast.success(`مرحباً ${pendingCustomer.name}`);
       navigate('/customer/dashboard');

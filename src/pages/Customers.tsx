@@ -325,6 +325,7 @@ const Customers = () => {
       balance: customer.balance,
       currency: customer.currency,
       balances: customer.balances,
+      impersonated_by_admin: true,
     }));
     navigate('/customer/dashboard');
   };
