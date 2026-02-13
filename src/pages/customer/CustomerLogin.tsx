@@ -8,7 +8,7 @@ import { Zap, Phone, Lock, Eye, EyeOff, KeyRound, ArrowRight, Fingerprint, Messa
 import { ServicesPricingModal } from '@/components/customer/ServicesPricingModal';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { sendActivationOtpEmail } from '@/lib/otpEmail';
-import { authenticateCustomerWithPasskey, isPasskeySupported } from '@/lib/customerPasskeyAuth';
+import { authenticateCustomerWithPasskey, isPasskeySupported, rememberCustomerForPasskey } from '@/lib/customerPasskeyAuth';
 import { toast } from 'sonner';
 
 interface PendingCustomer {
@@ -122,6 +122,7 @@ export default function CustomerLogin() {
   const openCustomerSession = (payload: CustomerSessionPayload) => {
     // Security: a real customer login must never inherit a stale admin session.
     localStorage.removeItem('admin_session');
+    rememberCustomerForPasskey(payload.id);
     localStorage.setItem(
       'customer_session',
       JSON.stringify({
@@ -328,11 +329,6 @@ export default function CustomerLogin() {
       return;
     }
 
-    if (!whatsappNumber.trim()) {
-      toast.error('أدخل رقم الواتساب أولاً');
-      return;
-    }
-
     if (!isPasskeySupported()) {
       toast.error('هذا المتصفح أو الجهاز لا يدعم بصمة الوجه');
       return;
@@ -380,6 +376,8 @@ export default function CustomerLogin() {
       const code = String(error?.message || '');
       if (code === 'not_configured') {
         toast.error('لم يتم تفعيل بصمة الوجه لهذا الحساب');
+      } else if (code === 'phone_required') {
+        toast.error('أدخل رقم الواتساب أول مرة، وبعدها يمكنك الدخول ببصمة الوجه مباشرة');
       } else if (code === 'unsupported') {
         toast.error('هذا المتصفح أو الجهاز لا يدعم بصمة الوجه');
       } else if (name === 'NotAllowedError') {

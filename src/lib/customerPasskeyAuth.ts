@@ -1,4 +1,5 @@
 const CUSTOMER_PASSKEYS_KEY = 'app_customer_passkeys';
+const CUSTOMER_PASSKEY_LAST_USED_KEY = 'app_customer_passkey_last_used';
 
 type PasskeyRecord = {
   customerId: string;
@@ -55,6 +56,14 @@ const upsertRecord = (record: PasskeyRecord) => {
   const store = loadStore();
   store[record.customerId] = record;
   saveStore(store);
+};
+
+const setLastUsedCustomerId = (customerId: string) => {
+  localStorage.setItem(CUSTOMER_PASSKEY_LAST_USED_KEY, customerId);
+};
+
+const getLastUsedCustomerId = (): string => {
+  return String(localStorage.getItem(CUSTOMER_PASSKEY_LAST_USED_KEY) || '');
 };
 
 export const isPasskeySupported = (): boolean => {
@@ -123,6 +132,7 @@ export const registerCustomerPasskey = async (
     enabled: true,
     updatedAt: new Date().toISOString(),
   });
+  setLastUsedCustomerId(customer.id);
 };
 
 export const setCustomerPasskeyEnabled = (customerId: string, enabled: boolean): void => {
@@ -138,16 +148,40 @@ export const removeCustomerPasskey = (customerId: string): void => {
   if (!store[customerId]) return;
   delete store[customerId];
   saveStore(store);
+  if (getLastUsedCustomerId() === customerId) {
+    localStorage.removeItem(CUSTOMER_PASSKEY_LAST_USED_KEY);
+  }
+};
+
+export const rememberCustomerForPasskey = (customerId: string): void => {
+  const rec = loadStore()[customerId];
+  if (!rec || !rec.enabled) return;
+  setLastUsedCustomerId(customerId);
 };
 
 export const authenticateCustomerWithPasskey = async (
-  whatsappNumber: string
+  whatsappNumber?: string
 ): Promise<{ customerId: string }> => {
   if (!isPasskeySupported()) throw new Error('unsupported');
 
-  const normalizedWhatsapp = normalizeWhatsapp(whatsappNumber);
   const store = loadStore();
-  const rec = Object.values(store).find((item) => item.enabled && item.whatsapp === normalizedWhatsapp);
+  const enabled = Object.values(store).filter((item) => item.enabled && item.credentialId);
+
+  let rec: PasskeyRecord | undefined;
+  const normalizedWhatsapp = normalizeWhatsapp(String(whatsappNumber || ''));
+
+  if (normalizedWhatsapp) {
+    rec = enabled.find((item) => item.whatsapp === normalizedWhatsapp);
+  } else {
+    const lastUsedId = getLastUsedCustomerId();
+    if (lastUsedId && store[lastUsedId]?.enabled) {
+      rec = store[lastUsedId];
+    } else if (enabled.length === 1) {
+      rec = enabled[0];
+    } else {
+      throw new Error('phone_required');
+    }
+  }
 
   if (!rec?.credentialId) throw new Error('not_configured');
 
@@ -162,5 +196,6 @@ export const authenticateCustomerWithPasskey = async (
   const result = (await navigator.credentials.get({ publicKey })) as PublicKeyCredential | null;
   if (!result) throw new Error('auth_failed');
 
+  setLastUsedCustomerId(rec.customerId);
   return { customerId: rec.customerId };
 };
