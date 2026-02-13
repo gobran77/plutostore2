@@ -13,6 +13,8 @@ let writeQueue: Promise<void> = Promise.resolve();
 let readQueue: Promise<void> = Promise.resolve();
 let pollingStarted = false;
 let pollingTimer: number | null = null;
+let nativeSetItemRef: ((this: Storage, key: string, value: string) => void) | null = null;
+let nativeRemoveItemRef: ((this: Storage, key: string) => void) | null = null;
 
 const shouldSyncKey = (key: string): boolean => key.startsWith('app_');
 
@@ -102,10 +104,12 @@ const installLocalStoragePatch = () => {
   const nativeSetItem = Storage.prototype.setItem;
   const nativeRemoveItem = Storage.prototype.removeItem;
   const nativeClear = Storage.prototype.clear;
+  nativeSetItemRef = nativeSetItem;
+  nativeRemoveItemRef = nativeRemoveItem;
 
   Storage.prototype.setItem = function patchedSetItem(key: string, value: string) {
     nativeSetItem.call(this, key, value);
-    if (this !== localStorage || isHydrating || !shouldSyncKey(key)) return;
+    if (this !== localStorage || !shouldSyncKey(key)) return;
     const now = Date.now();
     markSyncMeta(key, now, false);
     upsertCloudKey(key, value, now);
@@ -113,7 +117,7 @@ const installLocalStoragePatch = () => {
 
   Storage.prototype.removeItem = function patchedRemoveItem(key: string) {
     nativeRemoveItem.call(this, key);
-    if (this !== localStorage || isHydrating || !shouldSyncKey(key)) return;
+    if (this !== localStorage || !shouldSyncKey(key)) return;
     markSyncMeta(key, Date.now(), true);
     deleteCloudKey(key);
   };
@@ -132,7 +136,6 @@ const installLocalStoragePatch = () => {
 
     nativeClear.call(this);
 
-    if (isHydrating) return;
     const now = Date.now();
     keysToDelete.forEach((key) => {
       markSyncMeta(key, now, true);
@@ -173,7 +176,11 @@ const reconcileWithCloud = async (): Promise<void> => {
     const localSnapshot = getLocalSyncableSnapshot();
     localSnapshot.forEach((localValue, key) => {
       if (!cloudSnapshot.has(key)) {
-        localStorage.removeItem(key);
+        if (nativeRemoveItemRef) {
+          nativeRemoveItemRef.call(localStorage, key);
+        } else {
+          localStorage.removeItem(key);
+        }
         changedKeys.add(key);
         return;
       }
@@ -190,7 +197,11 @@ const reconcileWithCloud = async (): Promise<void> => {
       if (localStorage.getItem(key) !== cloud.value) {
         changedKeys.add(key);
       }
-      localStorage.setItem(key, cloud.value);
+      if (nativeSetItemRef) {
+        nativeSetItemRef.call(localStorage, key, cloud.value);
+      } else {
+        localStorage.setItem(key, cloud.value);
+      }
       meta[key] = { updatedAt: cloud.updatedAt || Date.now(), deleted: false };
     });
 
