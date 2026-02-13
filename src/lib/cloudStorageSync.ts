@@ -3,7 +3,7 @@ import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore'
 
 const CLOUD_STORAGE_COLLECTION = 'app_state';
 const CLOUD_SYNC_META_KEY = '__cloud_sync_meta__';
-const CLOUD_HEALTHCHECK_DOC = '__healthcheck__';
+const CLOUD_HEALTHCHECK_DOC = 'healthcheck_probe';
 
 let syncInitialized = false;
 let patchInstalled = false;
