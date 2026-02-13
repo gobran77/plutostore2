@@ -437,7 +437,7 @@ export function useServiceRequests() {
         return false;
       }
       if (availableBalance < requiredAmount) {
-        toast.error('Insufficient balance. Please use WhatsApp order.');
+        toast.error('لا يوجد لديك رصيد كافٍ. استخدم طلب الواتساب.');
         return false;
       }
 

@@ -123,24 +123,24 @@ export function ServiceOrderModal({
 
   const handleSubmitRequest = async () => {
     if (!selected) {
-      toast.error('Please select a subscription period');
+      toast.error('الرجاء اختيار مدة الاشتراك');
       return;
     }
 
     if (isPrivateService && !customerEmail) {
-      toast.error('Please enter activation email');
+      toast.error('الرجاء إدخال البريد الإلكتروني للتفعيل');
       return;
     }
 
     if (isPrivateService && !isValidEmail(customerEmail)) {
-      toast.error('Please enter a valid email address');
+      toast.error('الرجاء إدخال بريد إلكتروني صحيح');
       return;
     }
 
     if (!canAfford) {
-      toast.error('Insufficient balance. You can send this order via WhatsApp.');
+      toast.error('لا يوجد لديك رصيد كافٍ. يمكنك إرسال الطلب عبر واتساب.');
       const proceedViaWhatsApp = window.confirm(
-        `Insufficient balance for this service.\nRequired: ${selected.sellPrice} ${getCurrencySymbol(selected.currency)}\nAvailable: ${selectedCurrencyBalance} ${getCurrencySymbol(selected.currency)}\nShortfall: ${shortfallAmount} ${getCurrencySymbol(selected.currency)}\n\nSend this order via WhatsApp now?`
+        `رصيدك غير كافٍ لهذه الخدمة.\nالمطلوب: ${selected.sellPrice} ${getCurrencySymbol(selected.currency)}\nالمتاح: ${selectedCurrencyBalance} ${getCurrencySymbol(selected.currency)}\nالعجز: ${shortfallAmount} ${getCurrencySymbol(selected.currency)}\n\nهل تريد إرسال الطلب عبر واتساب الآن؟`
       );
       if (proceedViaWhatsApp) {
         handleOrderViaWhatsApp();
@@ -172,29 +172,29 @@ export function ServiceOrderModal({
 
   const handleOrderViaWhatsApp = () => {
     if (!selected) {
-      toast.error('Please select a subscription period');
+      toast.error('الرجاء اختيار مدة الاشتراك');
       return;
     }
 
     const message = encodeURIComponent(
-      `*New Subscription Order*\n\n` +
-      `*Customer:* ${customer.name}\n` +
-      `*Customer ID:* ${customer.id}\n` +
-      `*WhatsApp:* ${customer.whatsapp_number}\n` +
-      (isPrivateService && customerEmail ? `*Activation Email:* ${customerEmail}\n` : '') +
-      `\n*Service:* ${service.name}\n` +
-      `*Period:* ${selected.periodName}\n` +
-      `*Start Date:* ${format(subscriptionStartDate, 'dd MMM yyyy', { locale: ar })}\n` +
-      `*End Date:* ${format(subscriptionEndDate, 'dd MMM yyyy', { locale: ar })}\n` +
-      `*Price:* ${selected.sellPrice} ${getCurrencySymbol(selected.currency)}\n` +
-      `*Type:* ${service.default_type === 'shared' ? 'Shared Account' : 'Private Account'}\n\n` +
-      `*Available Balance (${selected.currency}):* ${selectedCurrencyBalance} ${getCurrencySymbol(selected.currency)}\n` +
-      `${canAfford ? '*Status:* Balance is sufficient for direct deduction' : `*Status:* Insufficient balance (shortfall: ${shortfallAmount} ${getCurrencySymbol(selected.currency)})`}\n` +
-      `\nPlease review and contact the customer.`
+      `*طلب اشتراك جديد*\n\n` +
+      `*العميل:* ${customer.name}\n` +
+      `*رقم العميل:* ${customer.id}\n` +
+      `*رقم الواتساب:* ${customer.whatsapp_number}\n` +
+      (isPrivateService && customerEmail ? `*إيميل التفعيل:* ${customerEmail}\n` : '') +
+      `\n*الخدمة:* ${service.name}\n` +
+      `*المدة:* ${selected.periodName}\n` +
+      `*بداية الاشتراك:* ${format(subscriptionStartDate, 'dd MMM yyyy', { locale: ar })}\n` +
+      `*نهاية الاشتراك:* ${format(subscriptionEndDate, 'dd MMM yyyy', { locale: ar })}\n` +
+      `*السعر:* ${selected.sellPrice} ${getCurrencySymbol(selected.currency)}\n` +
+      `*النوع:* ${service.default_type === 'shared' ? 'حساب مشترك' : 'حساب خاص'}\n\n` +
+      `*الرصيد المتاح (${selected.currency}):* ${selectedCurrencyBalance} ${getCurrencySymbol(selected.currency)}\n` +
+      `${canAfford ? '*الحالة:* الرصيد كافٍ للخصم المباشر' : `*الحالة:* لا يوجد رصيد كافٍ (العجز: ${shortfallAmount} ${getCurrencySymbol(selected.currency)})`}\n` +
+      `\nيرجى مراجعة الطلب والتواصل مع العميل.`
     );
 
     window.open(`https://wa.me/${adminWhatsApp}?text=${message}`, '_blank');
-    toast.success('WhatsApp opened with order details');
+    toast.success('تم فتح واتساب مع تفاصيل الطلب');
     onOpenChange(false);
   };
 
@@ -376,8 +376,8 @@ export function ServiceOrderModal({
             >
               <Send className="w-4 h-4 ml-2" />
               {isSubmitting
-                ? 'Sending...'
-                : (selected && !canAfford ? 'Insufficient balance - Send via WhatsApp' : 'Submit Request')}
+                ? 'جاري الإرسال...'
+                : (selected && !canAfford ? 'لا يوجد رصيد كافٍ - إرسال عبر واتساب' : 'إرسال الطلب')}
             </Button>
 
             {/* Secondary: WhatsApp option */}
