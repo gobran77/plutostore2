@@ -217,3 +217,37 @@ export const initializeCloudStorageSync = async (): Promise<void> => {
     isHydrating = false;
   }
 };
+
+export const waitForCloudStorageSyncIdle = async (): Promise<void> => {
+  await writeQueue;
+};
+
+export const purgeCloudAppState = async (): Promise<void> => {
+  // Ensure queued writes/removals finish first.
+  await waitForCloudStorageSyncIdle();
+
+  // Remove all local app_* keys and sync metadata.
+  const keysToDelete: string[] = [];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (key && shouldSyncKey(key)) keysToDelete.push(key);
+  }
+  keysToDelete.forEach((key) => localStorage.removeItem(key));
+
+  const meta = loadSyncMeta();
+  Object.keys(meta).forEach((key) => {
+    if (shouldSyncKey(key)) delete meta[key];
+  });
+  saveSyncMeta(meta);
+
+  if (!isFirebaseConfigured || !db) return;
+
+  // Hard-delete app_state docs from Firestore so no stale restore happens on other devices.
+  const snapshot = await getDocs(collection(db, CLOUD_STORAGE_COLLECTION));
+  const tasks: Promise<void>[] = [];
+  snapshot.forEach((item) => {
+    if (!shouldSyncKey(item.id)) return;
+    tasks.push(deleteDoc(doc(db, CLOUD_STORAGE_COLLECTION, item.id)));
+  });
+  await Promise.all(tasks);
+};

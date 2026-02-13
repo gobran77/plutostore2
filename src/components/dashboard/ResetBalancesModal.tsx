@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { supportedCurrencies, saveCurrencyBalances } from '@/types/currency';
+import { purgeCloudAppState } from '@/lib/cloudStorageSync';
+import { toast } from 'sonner';
 
 interface ResetBalancesModalProps {
   isOpen: boolean;
@@ -33,104 +35,103 @@ export const ResetBalancesModal = ({ isOpen, onClose, onReset }: ResetBalancesMo
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isConfirming, setIsConfirming] = useState(false);
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (!isConfirming) {
       setIsConfirming(true);
       return;
     }
+    try {
+      if (resetType === 'all') {
+        // Reset all balances to zero
+        const zeroed: Record<string, number> = {};
+        supportedCurrencies.forEach(c => zeroed[c.code] = 0);
+        saveCurrencyBalances(zeroed);
 
-    if (resetType === 'all') {
-      // Reset all balances to zero
-      const zeroed: Record<string, number> = {};
-      supportedCurrencies.forEach(c => zeroed[c.code] = 0);
-      saveCurrencyBalances(zeroed);
-      
-      // Clear all related data
-      localStorage.removeItem('app_payments');
-      localStorage.removeItem('app_invoices');
-      localStorage.removeItem('app_subscriptions');
-      localStorage.removeItem('app_cash_additions');
-      localStorage.removeItem('app_expenses');
-      localStorage.removeItem('app_currency_exchanges');
-    } else if (resetType === 'before_date' && selectedDate) {
-      // Filter and keep only data after the selected date
-      const cutoffDate = selectedDate.getTime();
+        // Hard-delete all app_state data (local + Firestore app_state) to avoid stale restore.
+        await purgeCloudAppState();
+      } else if (resetType === 'before_date' && selectedDate) {
+        // Filter and keep only data after the selected date
+        const cutoffDate = selectedDate.getTime();
 
-      // Filter payments
-      const paymentsData = localStorage.getItem('app_payments');
-      if (paymentsData) {
-        const payments = JSON.parse(paymentsData);
-        const filtered = payments.filter((p: any) => new Date(p.paidAt).getTime() >= cutoffDate);
-        if (filtered.length === 0) {
-          localStorage.removeItem('app_payments');
-        } else {
-          localStorage.setItem('app_payments', JSON.stringify(filtered));
+        // Filter payments
+        const paymentsData = localStorage.getItem('app_payments');
+        if (paymentsData) {
+          const payments = JSON.parse(paymentsData);
+          const filtered = payments.filter((p: any) => new Date(p.paidAt).getTime() >= cutoffDate);
+          if (filtered.length === 0) {
+            localStorage.removeItem('app_payments');
+          } else {
+            localStorage.setItem('app_payments', JSON.stringify(filtered));
+          }
+        }
+
+        // Filter invoices
+        const invoicesData = localStorage.getItem('app_invoices');
+        if (invoicesData) {
+          const invoices = JSON.parse(invoicesData);
+          const filtered = invoices.filter((i: any) => new Date(i.issuedAt).getTime() >= cutoffDate);
+          if (filtered.length === 0) {
+            localStorage.removeItem('app_invoices');
+          } else {
+            localStorage.setItem('app_invoices', JSON.stringify(filtered));
+          }
+        }
+
+        // Filter subscriptions
+        const subscriptionsData = localStorage.getItem('app_subscriptions');
+        if (subscriptionsData) {
+          const subscriptions = JSON.parse(subscriptionsData);
+          const filtered = subscriptions.filter((s: any) => new Date(s.startDate).getTime() >= cutoffDate);
+          if (filtered.length === 0) {
+            localStorage.removeItem('app_subscriptions');
+          } else {
+            localStorage.setItem('app_subscriptions', JSON.stringify(filtered));
+          }
+        }
+
+        // Filter cash additions
+        const cashData = localStorage.getItem('app_cash_additions');
+        if (cashData) {
+          const additions = JSON.parse(cashData);
+          const filtered = additions.filter((a: any) => new Date(a.createdAt).getTime() >= cutoffDate);
+          if (filtered.length === 0) {
+            localStorage.removeItem('app_cash_additions');
+          } else {
+            localStorage.setItem('app_cash_additions', JSON.stringify(filtered));
+          }
+        }
+
+        // Filter expenses
+        const expensesData = localStorage.getItem('app_expenses');
+        if (expensesData) {
+          const expenses = JSON.parse(expensesData);
+          const filtered = expenses.filter((e: any) => new Date(e.date).getTime() >= cutoffDate);
+          if (filtered.length === 0) {
+            localStorage.removeItem('app_expenses');
+          } else {
+            localStorage.setItem('app_expenses', JSON.stringify(filtered));
+          }
+        }
+
+        // Filter exchanges
+        const exchangesData = localStorage.getItem('app_currency_exchanges');
+        if (exchangesData) {
+          const exchanges = JSON.parse(exchangesData);
+          const filtered = exchanges.filter((e: any) => new Date(e.date).getTime() >= cutoffDate);
+          if (filtered.length === 0) {
+            localStorage.removeItem('app_currency_exchanges');
+          } else {
+            localStorage.setItem('app_currency_exchanges', JSON.stringify(filtered));
+          }
         }
       }
 
-      // Filter invoices
-      const invoicesData = localStorage.getItem('app_invoices');
-      if (invoicesData) {
-        const invoices = JSON.parse(invoicesData);
-        const filtered = invoices.filter((i: any) => new Date(i.issuedAt).getTime() >= cutoffDate);
-        if (filtered.length === 0) {
-          localStorage.removeItem('app_invoices');
-        } else {
-          localStorage.setItem('app_invoices', JSON.stringify(filtered));
-        }
-      }
-
-      // Filter subscriptions
-      const subscriptionsData = localStorage.getItem('app_subscriptions');
-      if (subscriptionsData) {
-        const subscriptions = JSON.parse(subscriptionsData);
-        const filtered = subscriptions.filter((s: any) => new Date(s.startDate).getTime() >= cutoffDate);
-        if (filtered.length === 0) {
-          localStorage.removeItem('app_subscriptions');
-        } else {
-          localStorage.setItem('app_subscriptions', JSON.stringify(filtered));
-        }
-      }
-
-      // Filter cash additions
-      const cashData = localStorage.getItem('app_cash_additions');
-      if (cashData) {
-        const additions = JSON.parse(cashData);
-        const filtered = additions.filter((a: any) => new Date(a.createdAt).getTime() >= cutoffDate);
-        if (filtered.length === 0) {
-          localStorage.removeItem('app_cash_additions');
-        } else {
-          localStorage.setItem('app_cash_additions', JSON.stringify(filtered));
-        }
-      }
-
-      // Filter expenses
-      const expensesData = localStorage.getItem('app_expenses');
-      if (expensesData) {
-        const expenses = JSON.parse(expensesData);
-        const filtered = expenses.filter((e: any) => new Date(e.date).getTime() >= cutoffDate);
-        if (filtered.length === 0) {
-          localStorage.removeItem('app_expenses');
-        } else {
-          localStorage.setItem('app_expenses', JSON.stringify(filtered));
-        }
-      }
-
-      // Filter exchanges
-      const exchangesData = localStorage.getItem('app_currency_exchanges');
-      if (exchangesData) {
-        const exchanges = JSON.parse(exchangesData);
-        const filtered = exchanges.filter((e: any) => new Date(e.date).getTime() >= cutoffDate);
-        if (filtered.length === 0) {
-          localStorage.removeItem('app_currency_exchanges');
-        } else {
-          localStorage.setItem('app_currency_exchanges', JSON.stringify(filtered));
-        }
-      }
+      onReset();
+      handleClose();
+    } catch (error) {
+      console.error('Reset balances failed:', error);
+      toast.error('فشل حذف البيانات من قاعدة البيانات');
     }
-
-    onReset();
-    handleClose();
   };
 
   const handleClose = () => {
