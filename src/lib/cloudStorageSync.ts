@@ -160,54 +160,35 @@ const readCloudState = async (): Promise<Map<string, CloudStateEntry>> => {
 const reconcileWithCloud = async (): Promise<void> => {
   if (!isFirebaseConfigured || !db) return;
 
-  // Keep ordering stable: flush local writes first, then pull cloud snapshot.
+  // Cloud-only source of truth: always pull from Firestore after flushing pending writes.
   await waitForCloudStorageSyncIdle();
 
   isHydrating = true;
   try {
-    const localSnapshot = getLocalSyncableSnapshot();
-    const meta = loadSyncMeta();
     const cloudSnapshot = await readCloudState();
-    const allKeys = new Set<string>([
-      ...localSnapshot.keys(),
-      ...cloudSnapshot.keys(),
-      ...Object.keys(meta).filter((k) => shouldSyncKey(k)),
-    ]);
 
-    for (const key of allKeys) {
-      const localValue = localSnapshot.get(key);
-      const localMeta = meta[key];
-      const localUpdatedAt = localMeta?.updatedAt || 0;
-
-      const cloud = cloudSnapshot.get(key);
-      const cloudUpdatedAt = cloud?.updatedAt || 0;
-
-      if (localMeta?.deleted) {
-        if (localUpdatedAt >= cloudUpdatedAt) {
-          localStorage.removeItem(key);
-          if (cloud) deleteCloudKey(key);
-          continue;
-        }
-
-        if (cloud) {
-          localStorage.setItem(key, cloud.value);
-          meta[key] = { updatedAt: cloudUpdatedAt, deleted: false };
-        }
-        continue;
+    // Remove any local app_* key that does not exist in cloud.
+    const localSnapshot = getLocalSyncableSnapshot();
+    localSnapshot.forEach((_, key) => {
+      if (!cloudSnapshot.has(key)) {
+        localStorage.removeItem(key);
       }
+    });
 
-      if (cloud && cloudUpdatedAt >= localUpdatedAt) {
-        localStorage.setItem(key, cloud.value);
-        meta[key] = { updatedAt: cloudUpdatedAt, deleted: false };
-        continue;
-      }
+    // Apply cloud snapshot to local cache.
+    const meta: SyncMetaState = {};
+    cloudSnapshot.forEach((cloud, key) => {
+      localStorage.setItem(key, cloud.value);
+      meta[key] = { updatedAt: cloud.updatedAt || Date.now(), deleted: false };
+    });
 
-      if (localValue != null) {
-        const now = localUpdatedAt || Date.now();
-        meta[key] = { updatedAt: now, deleted: false };
-        upsertCloudKey(key, localValue, now);
+    // Preserve non app_* meta keys if any.
+    const existingMeta = loadSyncMeta();
+    Object.keys(existingMeta).forEach((key) => {
+      if (!shouldSyncKey(key)) {
+        meta[key] = existingMeta[key];
       }
-    }
+    });
 
     saveSyncMeta(meta);
   } finally {
