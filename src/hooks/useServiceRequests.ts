@@ -10,6 +10,7 @@ import {
 } from '@/utils/invoicePaymentUtils';
 import { addCustomerActivity } from '@/lib/customerActivityLog';
 import { fixTextEncoding } from '@/lib/textEncoding';
+import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 
 // Service requests are stored in localStorage.
 
@@ -126,19 +127,21 @@ const getBalanceColumn = (currency: string): keyof LocalCustomerAccount => {
   }
 };
 
-const adjustBalance = (customerId: string, currency: string, delta: number) => {
+const adjustBalance = async (customerId: string, currency: string, delta: number): Promise<boolean> => {
   const col = getBalanceColumn(currency);
-  const accounts = loadArray<LocalCustomerAccount>(ACCOUNTS_KEY);
-  const idx = accounts.findIndex((a) => a.id === customerId);
-  if (idx === -1) return;
-  const cur = Number((accounts[idx] as any)[col] || 0);
-  (accounts[idx] as any)[col] = cur + delta;
-  saveArray(ACCOUNTS_KEY, accounts as any[]);
+  const accounts = await getCustomerAccounts();
+  const account = accounts.find((a) => String(a.id) === String(customerId));
+  if (!account) return false;
+
+  const current = Number((account as any)[col] || 0);
+  const next = current + Number(delta || 0);
+  const updated = await updateCustomerAccountRecord(String(account.id), { [col]: next } as any);
+  return Boolean(updated);
 };
 
-const getAvailableBalance = (customerId: string, currency: string): number => {
+const getAvailableBalance = async (customerId: string, currency: string): Promise<number> => {
   const col = getBalanceColumn(currency);
-  const accounts = loadArray<LocalCustomerAccount>(ACCOUNTS_KEY);
+  const accounts = await getCustomerAccounts();
   const account = accounts.find((a) => String(a.id) === String(customerId));
   if (!account) return 0;
   return Number((account as any)[col] || 0);
@@ -431,7 +434,7 @@ export function useServiceRequests() {
   }) => {
     try {
       const requiredAmount = Number(request.price || 0);
-      const availableBalance = getAvailableBalance(request.customer_id, request.currency);
+      const availableBalance = await getAvailableBalance(request.customer_id, request.currency);
       if (!Number.isFinite(requiredAmount) || requiredAmount <= 0) {
         toast.error('Invalid service price');
         return false;
@@ -441,7 +444,11 @@ export function useServiceRequests() {
         return false;
       }
 
-      adjustBalance(request.customer_id, request.currency, -Number(request.price || 0));
+      const deducted = await adjustBalance(request.customer_id, request.currency, -requiredAmount);
+      if (!deducted) {
+        toast.error('تعذر خصم الرصيد. أعد المحاولة.');
+        return false;
+      }
 
       const now = new Date().toISOString();
       const req: ServiceRequest = {
@@ -489,7 +496,7 @@ export function useServiceRequests() {
       const targetRequest = request || reqs[idx];
 
       if ((status === 'rejected' || status === 'failed') && targetRequest) {
-        adjustBalance(targetRequest.customer_id, targetRequest.currency, Number(targetRequest.price || 0));
+        await adjustBalance(targetRequest.customer_id, targetRequest.currency, Number(targetRequest.price || 0));
       }
 
       let linkPatch: Partial<ServiceRequest> = {};
@@ -549,7 +556,7 @@ export function useServiceRequests() {
   const deleteRequest = async (id: string, request?: ServiceRequest) => {
     try {
       if (request && request.status !== 'activated') {
-        adjustBalance(request.customer_id, request.currency, Number(request.price || 0));
+        await adjustBalance(request.customer_id, request.currency, Number(request.price || 0));
       }
 
       const reqs = loadArray<ServiceRequest>(REQUESTS_KEY).filter((r) => r.id !== id);
