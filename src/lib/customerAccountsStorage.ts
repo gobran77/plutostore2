@@ -31,6 +31,9 @@ const loadLocalAccounts = (): CustomerAccountRecord[] => {
 
 const saveLocalAccounts = (accounts: CustomerAccountRecord[]) => {
   localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('customer-accounts-updated'));
+  }
 };
 
 const normalizeAccount = (value: any): CustomerAccountRecord => ({

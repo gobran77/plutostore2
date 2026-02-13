@@ -24,28 +24,23 @@ interface CustomerSession {
   balances?: CustomerBalances;
 }
 
-export function ServicesSection() {
+interface ServicesSectionProps {
+  customer: CustomerSession;
+}
+
+export function ServicesSection({ customer }: ServicesSectionProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedService, setExpandedService] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const [customer, setCustomer] = useState<CustomerSession | null>(null);
 
   // Admin WhatsApp number
   const adminWhatsApp = '201030638992';
 
   useEffect(() => {
     fetchServices();
-    loadCustomerSession();
   }, []);
-
-  const loadCustomerSession = () => {
-    const session = localStorage.getItem('customer_session');
-    if (session) {
-      setCustomer(JSON.parse(session));
-    }
-  };
 
   const fetchServices = async () => {
     try {
@@ -220,15 +215,13 @@ export function ServicesSection() {
       </CardContent>
 
       {/* Service Order Modal */}
-      {customer && (
-        <ServiceOrderModal
-          open={showOrderModal}
-          onOpenChange={setShowOrderModal}
-          service={selectedService}
-          customer={customer}
-          onRechargeRequest={handleRechargeRequest}
-        />
-      )}
+      <ServiceOrderModal
+        open={showOrderModal}
+        onOpenChange={setShowOrderModal}
+        service={selectedService}
+        customer={customer}
+        onRechargeRequest={handleRechargeRequest}
+      />
     </Card>
   );
 }

@@ -426,11 +426,17 @@ export default function CustomerDashboard() {
       }
     };
 
+    const onCustomerAccountsUpdated = () => {
+      fetchUpdatedBalance(customer.id);
+    };
+
     window.addEventListener('storage', onStorage);
     window.addEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
+    window.addEventListener('customer-accounts-updated', onCustomerAccountsUpdated);
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
+      window.removeEventListener('customer-accounts-updated', onCustomerAccountsUpdated);
     };
   }, [customer?.id]);
 
@@ -1131,7 +1137,7 @@ export default function CustomerDashboard() {
 
         {/* Services Section */}
         {activeTab === 'services' && (
-          <ServicesSection />
+          <ServicesSection customer={customer} />
         )}
 
         {/* Tickets Section */}
