@@ -48,6 +48,7 @@ const normalizeAccount = (value: any): CustomerAccountRecord => ({
   balance_sar: Number(value?.balance_sar || 0),
   balance_yer: Number(value?.balance_yer || 0),
   balance_usd: Number(value?.balance_usd || 0),
+  biometric_face_enabled: Boolean(value?.biometric_face_enabled),
   status: (value?.status as CustomerStatus) || (Boolean(value?.is_activated) ? 'active' : 'inactive'),
   created_at:
     value?.created_at?.toDate && typeof value.created_at.toDate === 'function'

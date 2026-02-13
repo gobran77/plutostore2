@@ -18,6 +18,7 @@ import {
   Package,
   HeadphonesIcon,
   KeyRound,
+  Fingerprint,
   Bell,
   FileText
 } from 'lucide-react';
@@ -30,6 +31,13 @@ import { CustomerTickets } from '@/components/customer/CustomerTickets';
 import { getCurrencySymbol } from '@/types/currency';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { getCustomerActivity, type CustomerActivityItem } from '@/lib/customerActivityLog';
+import {
+  getCustomerPasskeyStatus,
+  isPasskeySupported,
+  registerCustomerPasskey,
+  removeCustomerPasskey,
+  setCustomerPasskeyEnabled,
+} from '@/lib/customerPasskeyAuth';
 
 interface CustomerBalances {
   balance_sar: number;
@@ -96,6 +104,10 @@ export default function CustomerDashboard() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodInfo[]>([]);
   const [accountActivities, setAccountActivities] = useState<CustomerActivityItem[]>([]);
   const [customerPayments, setCustomerPayments] = useState<CustomerPaymentRecord[]>([]);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [passkeyConfigured, setPasskeyConfigured] = useState(false);
+  const [passkeyEnabled, setPasskeyEnabled] = useState(false);
+  const [isPasskeyBusy, setIsPasskeyBusy] = useState(false);
   const slotIdsRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
 
@@ -227,6 +239,12 @@ export default function CustomerDashboard() {
     setAccountActivities(getCustomerActivity(customerId, 100));
   };
 
+  const refreshPasskeyState = (customerId: string) => {
+    const status = getCustomerPasskeyStatus(customerId);
+    setPasskeyConfigured(status.configured);
+    setPasskeyEnabled(status.enabled);
+  };
+
   useEffect(() => {
     const initSession = async () => {
       const session = localStorage.getItem('customer_session');
@@ -287,6 +305,16 @@ export default function CustomerDashboard() {
 
     initSession();
   }, [navigate]);
+
+  useEffect(() => {
+    setPasskeySupported(isPasskeySupported());
+    if (customer?.id) {
+      refreshPasskeyState(customer.id);
+    } else {
+      setPasskeyConfigured(false);
+      setPasskeyEnabled(false);
+    }
+  }, [customer?.id]);
 
   const fetchUpdatedBalance = async (customerId: string) => {
     try {
@@ -398,6 +426,76 @@ export default function CustomerDashboard() {
       loadPaymentMethods();
       loadCustomerPayments(customer.id, customer.name);
       loadAccountActivities(customer.id);
+      refreshPasskeyState(customer.id);
+    }
+  };
+
+  const handleEnableFaceLogin = async () => {
+    if (!customer || isAdmin) return;
+    if (!passkeySupported) {
+      toast.error('هذا الجهاز أو المتصفح لا يدعم بصمة الوجه');
+      return;
+    }
+
+    setIsPasskeyBusy(true);
+    try {
+      await registerCustomerPasskey({
+        id: customer.id,
+        name: customer.name,
+        whatsapp_number: customer.whatsapp_number,
+      });
+      setCustomerPasskeyEnabled(customer.id, true);
+      await updateCustomerAccountRecord(customer.id, { biometric_face_enabled: true } as any);
+      refreshPasskeyState(customer.id);
+      toast.success('تم تفعيل تسجيل الدخول ببصمة الوجه');
+    } catch (error: any) {
+      const name = String(error?.name || '');
+      const code = String(error?.message || '');
+      if (code === 'unsupported') {
+        toast.error('هذا الجهاز أو المتصفح لا يدعم بصمة الوجه');
+      } else if (name === 'NotAllowedError') {
+        toast.error('تم إلغاء طلب التفعيل');
+      } else if (name === 'InvalidStateError') {
+        toast.info('تم تسجيل بصمة مسبقاً على هذا الجهاز');
+        refreshPasskeyState(customer.id);
+      } else {
+        console.error('Failed to enable face login:', error);
+        toast.error('تعذر تفعيل بصمة الوجه');
+      }
+    } finally {
+      setIsPasskeyBusy(false);
+    }
+  };
+
+  const handleDisableFaceLogin = async () => {
+    if (!customer || isAdmin) return;
+    setIsPasskeyBusy(true);
+    try {
+      setCustomerPasskeyEnabled(customer.id, false);
+      await updateCustomerAccountRecord(customer.id, { biometric_face_enabled: false } as any);
+      refreshPasskeyState(customer.id);
+      toast.success('تم إيقاف تسجيل الدخول ببصمة الوجه');
+    } catch (error) {
+      console.error('Failed to disable face login:', error);
+      toast.error('تعذر إيقاف بصمة الوجه');
+    } finally {
+      setIsPasskeyBusy(false);
+    }
+  };
+
+  const handleRemoveFaceLogin = async () => {
+    if (!customer || isAdmin) return;
+    setIsPasskeyBusy(true);
+    try {
+      removeCustomerPasskey(customer.id);
+      await updateCustomerAccountRecord(customer.id, { biometric_face_enabled: false } as any);
+      refreshPasskeyState(customer.id);
+      toast.success('تم حذف بصمة الوجه من هذا الجهاز');
+    } catch (error) {
+      console.error('Failed to remove face login:', error);
+      toast.error('تعذر حذف بصمة الوجه');
+    } finally {
+      setIsPasskeyBusy(false);
     }
   };
 
@@ -1025,6 +1123,59 @@ export default function CustomerDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="border rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Fingerprint className="w-5 h-5 text-primary" />
+                    <p className="font-semibold">تسجيل الدخول ببصمة الوجه</p>
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      passkeyEnabled ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {passkeyEnabled ? 'مفعل' : 'غير مفعل'}
+                  </span>
+                </div>
+                {!passkeySupported ? (
+                  <p className="text-sm text-muted-foreground">
+                    هذا الجهاز أو المتصفح لا يدعم بصمة الوجه (Passkey).
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    فعّل بصمة الوجه لتسجيل الدخول بسرعة في هذا الجهاز بعد تفعيل الحساب.
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleEnableFaceLogin}
+                    disabled={!passkeySupported || isPasskeyBusy || isAdmin}
+                    className="h-9"
+                  >
+                    {isPasskeyBusy ? 'جاري المعالجة...' : passkeyConfigured ? 'إعادة تفعيل' : 'تفعيل بصمة الوجه'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDisableFaceLogin}
+                    disabled={!passkeyConfigured || !passkeyEnabled || isPasskeyBusy || isAdmin}
+                    className="h-9"
+                  >
+                    إيقاف مؤقت
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleRemoveFaceLogin}
+                    disabled={!passkeyConfigured || isPasskeyBusy || isAdmin}
+                    className="h-9"
+                  >
+                    حذف من هذا الجهاز
+                  </Button>
+                </div>
+              </div>
+
               {subscriptions.filter((s) => s.service_slots?.email || s.service_slots?.password).length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   لا توجد بيانات دخول حالياً

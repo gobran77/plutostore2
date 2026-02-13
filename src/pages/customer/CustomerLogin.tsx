@@ -8,6 +8,7 @@ import { Zap, Phone, Lock, Eye, EyeOff, KeyRound, ArrowRight, Fingerprint, Messa
 import { ServicesPricingModal } from '@/components/customer/ServicesPricingModal';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { sendActivationOtpEmail } from '@/lib/otpEmail';
+import { authenticateCustomerWithPasskey, isPasskeySupported } from '@/lib/customerPasskeyAuth';
 import { toast } from 'sonner';
 
 interface PendingCustomer {
@@ -101,6 +102,7 @@ export default function CustomerLogin() {
   const [pendingReset, setPendingReset] = useState<PendingCustomer | null>(null);
 
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
   const navigate = useNavigate();
 
   const openAdminSession = () => {
@@ -317,6 +319,77 @@ export default function CustomerLogin() {
       toast.error('??? ??? ????? ????? ??????');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    if (selectedAccountType !== 'customer') {
+      toast.error('بصمة الوجه متاحة لحسابات العملاء فقط');
+      return;
+    }
+
+    if (!whatsappNumber.trim()) {
+      toast.error('أدخل رقم الواتساب أولاً');
+      return;
+    }
+
+    if (!isPasskeySupported()) {
+      toast.error('هذا المتصفح أو الجهاز لا يدعم بصمة الوجه');
+      return;
+    }
+
+    setIsPasskeyLoading(true);
+    try {
+      const auth = await authenticateCustomerWithPasskey(whatsappNumber);
+      const accounts = await getCustomerAccounts();
+      const account = accounts.find((a) => String(a.id) === String(auth.customerId));
+
+      if (!account) {
+        toast.error('لم يتم العثور على الحساب المرتبط بالبصمة');
+        return;
+      }
+
+      if (!Boolean((account as any).is_activated)) {
+        toast.error('الحساب غير مفعل بعد');
+        return;
+      }
+
+      if (String((account as any).account_type || 'customer') !== 'customer') {
+        toast.error('بصمة الوجه متاحة لحسابات العملاء فقط');
+        return;
+      }
+
+      openCustomerSession({
+        id: account.id,
+        name: account.name,
+        whatsapp_number: account.whatsapp_number,
+        balance: account.balance || 0,
+        balances: {
+          balance_sar: Number((account as any)?.balance_sar || 0),
+          balance_yer: Number((account as any)?.balance_yer || 0),
+          balance_usd: Number((account as any)?.balance_usd || 0),
+        },
+        currency: account.currency || 'SAR',
+        activation_code: account.activation_code || '',
+      });
+
+      toast.success(`مرحباً ${account.name}`);
+      navigate('/customer/dashboard');
+    } catch (error: any) {
+      const name = String(error?.name || '');
+      const code = String(error?.message || '');
+      if (code === 'not_configured') {
+        toast.error('لم يتم تفعيل بصمة الوجه لهذا الحساب');
+      } else if (code === 'unsupported') {
+        toast.error('هذا المتصفح أو الجهاز لا يدعم بصمة الوجه');
+      } else if (name === 'NotAllowedError') {
+        toast.error('تم إلغاء طلب التحقق ببصمة الوجه');
+      } else {
+        console.error('Passkey login failed:', error);
+        toast.error('فشل تسجيل الدخول ببصمة الوجه');
+      }
+    } finally {
+      setIsPasskeyLoading(false);
     }
   };
 
@@ -592,11 +665,12 @@ export default function CustomerLogin() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => toast.info('????? ?????? ???????')}
+                  onClick={handlePasskeyLogin}
+                  disabled={isPasskeyLoading}
                   className="flex items-center justify-center gap-2 w-full text-sm text-muted-foreground hover:text-foreground transition-colors pt-1"
                 >
                   <Fingerprint className="w-4 h-4" />
-                  ????? ?????? ???????
+                  {isPasskeyLoading ? 'جاري التحقق ببصمة الوجه...' : 'تسجيل الدخول ببصمة الوجه'}
                 </button>
               </div>
 

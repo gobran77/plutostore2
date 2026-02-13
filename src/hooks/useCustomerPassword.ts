@@ -19,6 +19,7 @@ export type LocalCustomerAccount = {
   balance_sar?: number;
   balance_yer?: number;
   balance_usd?: number;
+  biometric_face_enabled?: boolean;
 };
 
 const loadAccounts = (): LocalCustomerAccount[] => {
