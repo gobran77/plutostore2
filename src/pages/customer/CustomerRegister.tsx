@@ -51,6 +51,11 @@ export default function CustomerRegister() {
       return;
     }
 
+    if (accountType === 'merchant') {
+      toast.info('خدمة حساب التاجر ستتوفر قريباً');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -169,7 +174,15 @@ export default function CustomerRegister() {
               <select
                 id="accountType"
                 value={accountType}
-                onChange={(e) => setAccountType(e.target.value as 'customer' | 'merchant')}
+                onChange={(e) => {
+                  const nextType = e.target.value as 'customer' | 'merchant';
+                  if (nextType === 'merchant') {
+                    toast.info('خدمة حساب التاجر ستتوفر قريباً');
+                    setAccountType('customer');
+                    return;
+                  }
+                  setAccountType(nextType);
+                }}
                 className="w-full h-12 px-3 rounded-md border border-input bg-background text-base"
               >
                 <option value="customer">عميل</option>

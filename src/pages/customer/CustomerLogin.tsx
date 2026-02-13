@@ -218,6 +218,11 @@ export default function CustomerLogin() {
       return;
     }
 
+    if (selectedAccountType === 'merchant') {
+      toast.info('خدمة حساب التاجر ستتوفر قريباً');
+      return;
+    }
+
     if (selectedAccountType === 'admin') {
       if (!isSameWhatsapp(ADMIN_PHONE, whatsappNumber)) {
         toast.error('??? ?????? ??? ????');
@@ -542,7 +547,10 @@ export default function CustomerLogin() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSelectedAccountType('merchant')}
+                    onClick={() => {
+                      toast.info('خدمة حساب التاجر ستتوفر قريباً');
+                      setSelectedAccountType('customer');
+                    }}
                     className={`h-12 rounded-md border text-sm font-medium transition-colors ${
                       selectedAccountType === 'merchant'
                         ? 'border-primary bg-primary/10 text-primary'
