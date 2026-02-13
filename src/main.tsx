@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { initializeCloudStorageSync } from "@/lib/cloudStorageSync";
+import { initializeCloudStorageSync, startCloudStoragePolling, syncCloudStorageNow } from "@/lib/cloudStorageSync";
 import { missingFirebaseEnvKeys } from "@/integrations/firebase/client";
 
 const bootstrap = async () => {
@@ -11,6 +11,8 @@ const bootstrap = async () => {
     // Cloud-only mode: do not allow silent fallback to local storage.
     await initializeCloudStorageSync({ requireCloud: true });
     root.render(<App />);
+    startCloudStoragePolling(3000);
+    syncCloudStorageNow().catch(() => {});
   } catch (error: any) {
     console.error("Firebase bootstrap failed:", error);
 

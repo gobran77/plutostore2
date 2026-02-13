@@ -9,6 +9,9 @@ let syncInitialized = false;
 let patchInstalled = false;
 let isHydrating = false;
 let writeQueue: Promise<void> = Promise.resolve();
+let readQueue: Promise<void> = Promise.resolve();
+let pollingStarted = false;
+let pollingTimer: number | null = null;
 
 const shouldSyncKey = (key: string): boolean => key.startsWith('app_');
 
@@ -154,44 +157,14 @@ const readCloudState = async (): Promise<Map<string, CloudStateEntry>> => {
   return cloudState;
 };
 
-export const verifyCloudStorageAccess = async (): Promise<void> => {
-  if (!isFirebaseConfigured || !db) {
-    throw new Error('firebase_not_configured');
-  }
+const reconcileWithCloud = async (): Promise<void> => {
+  if (!isFirebaseConfigured || !db) return;
 
-  // Verify both read and write access to app_state.
-  await getDocs(collection(db, CLOUD_STORAGE_COLLECTION));
-  await setDoc(
-    doc(db, CLOUD_STORAGE_COLLECTION, CLOUD_HEALTHCHECK_DOC),
-    { value: 'ok', updated_at: new Date().toISOString() },
-    { merge: true }
-  );
-  await deleteDoc(doc(db, CLOUD_STORAGE_COLLECTION, CLOUD_HEALTHCHECK_DOC));
-};
+  // Keep ordering stable: flush local writes first, then pull cloud snapshot.
+  await waitForCloudStorageSyncIdle();
 
-export const initializeCloudStorageSync = async (
-  options: { requireCloud?: boolean } = {}
-): Promise<void> => {
-  const requireCloud = options.requireCloud ?? false;
-  if (syncInitialized) return;
-
-  if (!isFirebaseConfigured || !db) {
-    if (requireCloud) {
-      throw new Error('firebase_not_configured');
-    }
-    syncInitialized = true;
-    installLocalStoragePatch();
-    console.warn('Firebase is not configured. App data remains local.');
-    return;
-  }
-
+  isHydrating = true;
   try {
-    // Ensure Firestore access before enabling app state sync.
-    await verifyCloudStorageAccess();
-    syncInitialized = true;
-    installLocalStoragePatch();
-    isHydrating = true;
-
     const localSnapshot = getLocalSyncableSnapshot();
     const meta = loadSyncMeta();
     const cloudSnapshot = await readCloudState();
@@ -237,18 +210,90 @@ export const initializeCloudStorageSync = async (
     }
 
     saveSyncMeta(meta);
-  } catch (error) {
-    if (requireCloud) throw error;
-    syncInitialized = true;
-    installLocalStoragePatch();
-    console.error('Failed to initialize cloud storage sync:', error);
   } finally {
     isHydrating = false;
   }
 };
 
+export const verifyCloudStorageAccess = async (): Promise<void> => {
+  if (!isFirebaseConfigured || !db) {
+    throw new Error('firebase_not_configured');
+  }
+
+  // Verify both read and write access to app_state.
+  await getDocs(collection(db, CLOUD_STORAGE_COLLECTION));
+  await setDoc(
+    doc(db, CLOUD_STORAGE_COLLECTION, CLOUD_HEALTHCHECK_DOC),
+    { value: 'ok', updated_at: new Date().toISOString() },
+    { merge: true }
+  );
+  await deleteDoc(doc(db, CLOUD_STORAGE_COLLECTION, CLOUD_HEALTHCHECK_DOC));
+};
+
+export const initializeCloudStorageSync = async (
+  options: { requireCloud?: boolean } = {}
+): Promise<void> => {
+  const requireCloud = options.requireCloud ?? false;
+  if (syncInitialized) return;
+
+  if (!isFirebaseConfigured || !db) {
+    if (requireCloud) {
+      throw new Error('firebase_not_configured');
+    }
+    syncInitialized = true;
+    installLocalStoragePatch();
+    console.warn('Firebase is not configured. App data remains local.');
+    return;
+  }
+
+  try {
+    // Ensure Firestore access before enabling app state sync.
+    await verifyCloudStorageAccess();
+    syncInitialized = true;
+    installLocalStoragePatch();
+    await reconcileWithCloud();
+  } catch (error) {
+    if (requireCloud) throw error;
+    syncInitialized = true;
+    installLocalStoragePatch();
+    console.error('Failed to initialize cloud storage sync:', error);
+  }
+};
+
 export const waitForCloudStorageSyncIdle = async (): Promise<void> => {
   await writeQueue;
+};
+
+export const syncCloudStorageNow = async (): Promise<void> => {
+  // Serialize pull cycles.
+  readQueue = readQueue
+    .then(async () => {
+      if (!syncInitialized) return;
+      await reconcileWithCloud();
+    })
+    .catch((error) => {
+      console.error('Cloud storage manual sync failed:', error);
+    });
+  await readQueue;
+};
+
+export const startCloudStoragePolling = (intervalMs: number = 4000): void => {
+  if (pollingStarted) return;
+  pollingStarted = true;
+
+  const tick = () => {
+    syncCloudStorageNow().catch((error) => {
+      console.error('Cloud storage polling sync failed:', error);
+    });
+  };
+
+  if (typeof window !== 'undefined') {
+    pollingTimer = window.setInterval(tick, Math.max(2000, intervalMs));
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) tick();
+    });
+    window.addEventListener('focus', tick);
+  }
 };
 
 export const purgeCloudAppState = async (): Promise<void> => {
