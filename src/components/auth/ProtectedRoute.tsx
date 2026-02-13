@@ -9,39 +9,41 @@ interface ProtectedRouteProps {
 export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const [isChecking, setIsChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
-    // Check for admin session
+    let hasAdminSession = false;
+    let hasCustomerSession = false;
+
+    // Check admin session validity.
     const adminSession = localStorage.getItem('admin_session');
     if (adminSession) {
       try {
         const parsed = JSON.parse(adminSession);
         if (parsed && parsed.id) {
-          setIsAuthenticated(true);
-          setIsAdmin(true);
+          hasAdminSession = true;
         }
       } catch (e) {
         console.error('Error parsing admin session:', e);
       }
     }
-    
-    // Check for customer session (if not requiring admin)
-    if (!requireAdmin) {
-      const customerSession = localStorage.getItem('customer_session');
-      if (customerSession) {
-        try {
-          const parsed = JSON.parse(customerSession);
-          if (parsed && parsed.id) {
-            setIsAuthenticated(true);
-          }
-        } catch (e) {
-          console.error('Error parsing customer session:', e);
+
+    // Check customer session validity.
+    const customerSession = localStorage.getItem('customer_session');
+    if (customerSession) {
+      try {
+        const parsed = JSON.parse(customerSession);
+        if (parsed && parsed.id) {
+          hasCustomerSession = true;
         }
+      } catch (e) {
+        console.error('Error parsing customer session:', e);
       }
     }
-    
+
+    setIsAdminAuthenticated(hasAdminSession);
+    setIsAuthenticated(requireAdmin ? hasAdminSession : hasCustomerSession);
     setIsChecking(false);
   }, [requireAdmin]);
 
@@ -54,7 +56,7 @@ export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRout
   }
 
   // If requiring admin and user is not admin
-  if (requireAdmin && !isAdmin) {
+  if (requireAdmin && !isAdminAuthenticated) {
     return <Navigate to="/customer" state={{ from: location }} replace />;
   }
 

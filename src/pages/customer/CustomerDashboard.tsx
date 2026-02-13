@@ -228,37 +228,75 @@ export default function CustomerDashboard() {
   };
 
   useEffect(() => {
-    const session = localStorage.getItem('customer_session');
-    if (!session) {
-      navigate('/customer');
-      return;
-    }
+    const initSession = async () => {
+      const session = localStorage.getItem('customer_session');
+      if (!session) {
+        navigate('/customer', { replace: true });
+        return;
+      }
 
-    const customerData = JSON.parse(session) as CustomerSession;
-    const adminSession = localStorage.getItem('admin_session');
-    const isAdminImpersonation = Boolean(customerData?.impersonated_by_admin) && Boolean(adminSession);
-    setIsAdmin(isAdminImpersonation);
+      let customerData: CustomerSession;
+      try {
+        customerData = JSON.parse(session) as CustomerSession;
+      } catch {
+        localStorage.removeItem('customer_session');
+        navigate('/customer', { replace: true });
+        return;
+      }
 
-    // Ensure balances object exists (older sessions won't have it).
-    const balances: CustomerBalances = customerData.balances || {
-      balance_sar: 0,
-      balance_yer: 0,
-      balance_usd: 0,
+      const sessionId = String(customerData?.id || '').trim();
+      if (!sessionId) {
+        localStorage.removeItem('customer_session');
+        navigate('/customer', { replace: true });
+        return;
+      }
+
+      try {
+        const accounts = await getCustomerAccounts();
+        const account = accounts.find((a) => String(a.id) === sessionId);
+        if (!account) {
+          // Prevent stale/deleted sessions from showing old fixed users after refresh.
+          localStorage.removeItem('customer_session');
+          toast.error('انتهت جلسة هذا الحساب. يرجى تسجيل الدخول مرة أخرى.');
+          navigate('/customer', { replace: true });
+          return;
+        }
+
+        const adminSession = localStorage.getItem('admin_session');
+        const isAdminImpersonation = Boolean(customerData?.impersonated_by_admin) && Boolean(adminSession);
+        setIsAdmin(isAdminImpersonation);
+
+        // Ensure balances object exists (older sessions won't have it).
+        const balances: CustomerBalances = customerData.balances || {
+          balance_sar: 0,
+          balance_yer: 0,
+          balance_usd: 0,
+        };
+        const normalized = { ...customerData, balances };
+        setCustomer(normalized);
+        fetchSubscriptions(normalized.id);
+        fetchUpdatedBalance(normalized.id);
+        loadPaymentMethods();
+        loadCustomerPayments(normalized.id, normalized.name);
+        loadAccountActivities(normalized.id);
+      } catch (error) {
+        console.error('Error validating customer session:', error);
+        navigate('/customer', { replace: true });
+      }
     };
-    const normalized = { ...customerData, balances };
-    setCustomer(normalized);
-    fetchSubscriptions(normalized.id);
-    fetchUpdatedBalance(normalized.id);
-    loadPaymentMethods();
-    loadCustomerPayments(normalized.id, normalized.name);
-    loadAccountActivities(normalized.id);
+
+    initSession();
   }, [navigate]);
 
   const fetchUpdatedBalance = async (customerId: string) => {
     try {
       const accounts = await getCustomerAccounts();
       const account = accounts.find((a) => String(a.id) === String(customerId));
-      if (!account) return;
+      if (!account) {
+        localStorage.removeItem('customer_session');
+        navigate('/customer', { replace: true });
+        return;
+      }
 
       const storedBalances: CustomerBalances = {
         balance_sar: Number((account as any)?.balance_sar || 0),
