@@ -23,7 +23,7 @@ import { useServiceRequests } from '@/hooks/useServiceRequests';
 import { useSupportTickets } from '@/hooks/useSupportTickets';
 
 const menuItems = [
-  { icon: LayoutDashboard, label: 'لوحة التحكم', path: '/' },
+  { icon: LayoutDashboard, label: 'لوحة التحكم', path: '/admin' },
   { icon: ClipboardList, label: 'الطلبات', path: '/requests', badgeKey: 'requests' },
   { icon: Package2, label: 'الخدمات', path: '/services' },
   { icon: Users, label: 'العملاء', path: '/customers' },

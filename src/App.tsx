@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
@@ -31,8 +31,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Public entry route */}
+          <Route path="/" element={<Navigate to="/customer" replace />} />
+
           {/* Admin Protected Routes */}
-          <Route path="/" element={<ProtectedRoute requireAdmin><Dashboard /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute requireAdmin><Dashboard /></ProtectedRoute>} />
           <Route path="/requests" element={<ProtectedRoute requireAdmin><ServiceRequests /></ProtectedRoute>} />
           <Route path="/services" element={<ProtectedRoute requireAdmin><Services /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute requireAdmin><Customers /></ProtectedRoute>} />

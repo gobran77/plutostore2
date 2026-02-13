@@ -114,7 +114,7 @@ export default function CustomerLogin() {
       })
     );
     toast.success('?? ????? ???? ??????');
-    navigate('/');
+    navigate('/admin');
   };
 
   const openCustomerSession = (payload: CustomerSessionPayload) => {
