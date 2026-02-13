@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,19 +102,6 @@ export default function CustomerLogin() {
 
   const [showPricingModal, setShowPricingModal] = useState(false);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    try {
-      const rawSession = localStorage.getItem('customer_session');
-      if (!rawSession) return;
-      const parsed = JSON.parse(rawSession);
-      if (parsed && parsed.id) {
-        navigate('/customer/dashboard', { replace: true });
-      }
-    } catch {
-      // ignore invalid session payload
-    }
-  }, [navigate]);
 
   const openAdminSession = () => {
     localStorage.setItem(
