@@ -119,25 +119,37 @@ export function ServiceOrderModal({
   };
   
   const canSubmit = selected && (!isPrivateService || (customerEmail && isValidEmail(customerEmail)));
+  const shortfallAmount = selected ? Math.max(0, selected.sellPrice - selectedCurrencyBalance) : 0;
 
   const handleSubmitRequest = async () => {
     if (!selected) {
-      toast.error('الرجاء اختيار مدة الاشتراك');
+      toast.error('Please select a subscription period');
       return;
     }
 
     if (isPrivateService && !customerEmail) {
-      toast.error('الرجاء إدخال البريد الإلكتروني للتفعيل');
+      toast.error('Please enter activation email');
       return;
     }
 
     if (isPrivateService && !isValidEmail(customerEmail)) {
-      toast.error('الرجاء إدخال بريد إلكتروني صحيح');
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    if (!canAfford) {
+      toast.error('Insufficient balance. You can send this order via WhatsApp.');
+      const proceedViaWhatsApp = window.confirm(
+        `Insufficient balance for this service.\nRequired: ${selected.sellPrice} ${getCurrencySymbol(selected.currency)}\nAvailable: ${selectedCurrencyBalance} ${getCurrencySymbol(selected.currency)}\nShortfall: ${shortfallAmount} ${getCurrencySymbol(selected.currency)}\n\nSend this order via WhatsApp now?`
+      );
+      if (proceedViaWhatsApp) {
+        handleOrderViaWhatsApp();
+      }
       return;
     }
 
     setIsSubmitting(true);
-    
+
     const success = await createRequest({
       customer_id: customer.id,
       service_id: service.id,
@@ -160,27 +172,29 @@ export function ServiceOrderModal({
 
   const handleOrderViaWhatsApp = () => {
     if (!selected) {
-      toast.error('الرجاء اختيار مدة الاشتراك');
+      toast.error('Please select a subscription period');
       return;
     }
 
     const message = encodeURIComponent(
-      `🛒 *طلب اشتراك جديد*\n\n` +
-      `👤 *العميل:* ${customer.name}\n` +
-      `📱 *رقم الواتساب:* ${customer.whatsapp_number}\n` +
-      (isPrivateService && customerEmail ? `📧 *إيميل التفعيل:* ${customerEmail}\n` : '') +
-      `\n📦 *الخدمة:* ${service.name}\n` +
-      `📅 *المدة:* ${selected.periodName}\n` +
-      `🗓️ *بداية الاشتراك:* ${format(subscriptionStartDate, 'dd MMM yyyy', { locale: ar })}\n` +
-      `⏳ *نهاية الاشتراك:* ${format(subscriptionEndDate, 'dd MMM yyyy', { locale: ar })}\n` +
-      `💰 *السعر:* ${selected.sellPrice} ${getCurrencySymbol(selected.currency)}\n` +
-      `🏷️ *النوع:* ${service.default_type === 'shared' ? 'حساب مشترك' : 'حساب خاص'}\n\n` +
-      `💳 *الرصيد الحالي:* ${customer.balance} ${customer.currency}\n` +
-      `${canAfford ? '✅ الرصيد كافي للخصم المباشر' : '⚠️ يحتاج شحن رصيد'}`
+      `*New Subscription Order*\n\n` +
+      `*Customer:* ${customer.name}\n` +
+      `*Customer ID:* ${customer.id}\n` +
+      `*WhatsApp:* ${customer.whatsapp_number}\n` +
+      (isPrivateService && customerEmail ? `*Activation Email:* ${customerEmail}\n` : '') +
+      `\n*Service:* ${service.name}\n` +
+      `*Period:* ${selected.periodName}\n` +
+      `*Start Date:* ${format(subscriptionStartDate, 'dd MMM yyyy', { locale: ar })}\n` +
+      `*End Date:* ${format(subscriptionEndDate, 'dd MMM yyyy', { locale: ar })}\n` +
+      `*Price:* ${selected.sellPrice} ${getCurrencySymbol(selected.currency)}\n` +
+      `*Type:* ${service.default_type === 'shared' ? 'Shared Account' : 'Private Account'}\n\n` +
+      `*Available Balance (${selected.currency}):* ${selectedCurrencyBalance} ${getCurrencySymbol(selected.currency)}\n` +
+      `${canAfford ? '*Status:* Balance is sufficient for direct deduction' : `*Status:* Insufficient balance (shortfall: ${shortfallAmount} ${getCurrencySymbol(selected.currency)})`}\n` +
+      `\nPlease review and contact the customer.`
     );
 
     window.open(`https://wa.me/${adminWhatsApp}?text=${message}`, '_blank');
-    toast.success('تم فتح واتساب لإرسال الطلب');
+    toast.success('WhatsApp opened with order details');
     onOpenChange(false);
   };
 
@@ -361,7 +375,9 @@ export function ServiceOrderModal({
               disabled={!canSubmit || isSubmitting}
             >
               <Send className="w-4 h-4 ml-2" />
-              {isSubmitting ? 'جاري الإرسال...' : 'إرسال الطلب'}
+              {isSubmitting
+                ? 'Sending...'
+                : (selected && !canAfford ? 'Insufficient balance - Send via WhatsApp' : 'Submit Request')}
             </Button>
 
             {/* Secondary: WhatsApp option */}

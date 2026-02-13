@@ -136,6 +136,14 @@ const adjustBalance = (customerId: string, currency: string, delta: number) => {
   saveArray(ACCOUNTS_KEY, accounts as any[]);
 };
 
+const getAvailableBalance = (customerId: string, currency: string): number => {
+  const col = getBalanceColumn(currency);
+  const accounts = loadArray<LocalCustomerAccount>(ACCOUNTS_KEY);
+  const account = accounts.find((a) => String(a.id) === String(customerId));
+  if (!account) return 0;
+  return Number((account as any)[col] || 0);
+};
+
 const getCustomerName = (customerId: string, fallback?: string) => {
   const accounts = loadArray<LocalCustomerAccount>(ACCOUNTS_KEY);
   const account = accounts.find((a) => String(a.id) === String(customerId));
@@ -422,6 +430,17 @@ export function useServiceRequests() {
     customer_email?: string;
   }) => {
     try {
+      const requiredAmount = Number(request.price || 0);
+      const availableBalance = getAvailableBalance(request.customer_id, request.currency);
+      if (!Number.isFinite(requiredAmount) || requiredAmount <= 0) {
+        toast.error('Invalid service price');
+        return false;
+      }
+      if (availableBalance < requiredAmount) {
+        toast.error('Insufficient balance. Please use WhatsApp order.');
+        return false;
+      }
+
       adjustBalance(request.customer_id, request.currency, -Number(request.price || 0));
 
       const now = new Date().toISOString();

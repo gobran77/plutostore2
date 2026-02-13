@@ -32,6 +32,7 @@ import { CustomerTickets } from '@/components/customer/CustomerTickets';
 import { getCurrencySymbol } from '@/types/currency';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { getCustomerActivity, type CustomerActivityItem } from '@/lib/customerActivityLog';
+import { CLOUD_STATE_UPDATED_EVENT } from '@/lib/cloudStorageSync';
 import {
   getCustomerPasskeyStatus,
   isPasskeySupported,
@@ -405,8 +406,32 @@ export default function CustomerDashboard() {
       }
     };
 
+    const onCloudStateUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ keys?: string[] }>;
+      const changed = new Set(customEvent?.detail?.keys || []);
+      if (changed.has(SUBSCRIPTIONS_STORAGE_KEY)) {
+        fetchSubscriptions(customer.id);
+      }
+      if (changed.has('app_customer_accounts')) {
+        fetchUpdatedBalance(customer.id);
+      }
+      if (changed.has(PAYMENT_METHODS_STORAGE_KEY)) {
+        loadPaymentMethods();
+      }
+      if (changed.has(PAYMENTS_STORAGE_KEY)) {
+        loadCustomerPayments(customer.id, customer.name);
+      }
+      if (changed.has(CUSTOMER_ACTIVITY_KEY)) {
+        loadAccountActivities(customer.id);
+      }
+    };
+
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
+    };
   }, [customer?.id]);
 
   const handleLogout = () => {

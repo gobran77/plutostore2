@@ -26,6 +26,7 @@ import { subtractFromBalance } from '@/types/currency';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { addCustomerActivity } from '@/lib/customerActivityLog';
 import { fixTextEncoding } from '@/lib/textEncoding';
+import { CLOUD_STATE_UPDATED_EVENT } from '@/lib/cloudStorageSync';
 
 const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
 const SERVICES_STORAGE_KEY = 'app_services';
@@ -106,6 +107,44 @@ const Subscriptions = () => {
   const [whatsAppData, setWhatsAppData] = useState<{ customerName: string; whatsappNumber: string; message: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
+  const loadSubscriptions = () => {
+    const savedSubscriptions = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
+    if (!savedSubscriptions) {
+      setSubscriptions([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(savedSubscriptions);
+      const subscriptionsWithDates = parsed.map((s: any) => ({
+        ...s,
+        customerName: fixTextEncoding(String(s?.customerName || '')),
+        startDate: new Date(s.startDate),
+        endDate: new Date(s.endDate),
+        dueDate: s.dueDate ? new Date(s.dueDate) : undefined,
+        paymentNotes: s?.paymentNotes ? fixTextEncoding(String(s.paymentNotes)) : undefined,
+        paymentMethod: s?.paymentMethod
+          ? {
+              ...s.paymentMethod,
+              name: fixTextEncoding(String(s.paymentMethod?.name || '')),
+              details: s.paymentMethod?.details ? fixTextEncoding(String(s.paymentMethod.details)) : undefined,
+            }
+          : undefined,
+        services: Array.isArray(s?.services)
+          ? s.services.map((x: any) => ({
+              ...x,
+              serviceName: fixTextEncoding(String(x?.serviceName || '')),
+            }))
+          : [],
+        paymentStatus: s.paymentStatus || 'paid',
+        paidAmount: s.paidAmount || s.totalPrice,
+      }));
+      setSubscriptions(subscriptionsWithDates);
+    } catch (e) {
+      console.error('Error loading subscriptions:', e);
+      setSubscriptions([]);
+    }
+  };
+
   // Customers are loaded from localStorage only.
   const loadCustomers = () => {
     const raw = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
@@ -148,39 +187,7 @@ const Subscriptions = () => {
 
   // Load data on mount
   useEffect(() => {
-    // Load subscriptions from localStorage
-    const savedSubscriptions = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
-    if (savedSubscriptions) {
-      try {
-        const parsed = JSON.parse(savedSubscriptions);
-        const subscriptionsWithDates = parsed.map((s: any) => ({
-          ...s,
-          customerName: fixTextEncoding(String(s?.customerName || '')),
-          startDate: new Date(s.startDate),
-          endDate: new Date(s.endDate),
-          dueDate: s.dueDate ? new Date(s.dueDate) : undefined,
-          paymentNotes: s?.paymentNotes ? fixTextEncoding(String(s.paymentNotes)) : undefined,
-          paymentMethod: s?.paymentMethod
-            ? {
-                ...s.paymentMethod,
-                name: fixTextEncoding(String(s.paymentMethod?.name || '')),
-                details: s.paymentMethod?.details ? fixTextEncoding(String(s.paymentMethod.details)) : undefined,
-              }
-            : undefined,
-          services: Array.isArray(s?.services)
-            ? s.services.map((x: any) => ({
-                ...x,
-                serviceName: fixTextEncoding(String(x?.serviceName || '')),
-              }))
-            : [],
-          paymentStatus: s.paymentStatus || 'paid',
-          paidAmount: s.paidAmount || s.totalPrice,
-        }));
-        setSubscriptions(subscriptionsWithDates);
-      } catch (e) {
-        console.error('Error loading subscriptions:', e);
-      }
-    }
+    loadSubscriptions();
 
     // Load customers from localStorage
     loadCustomers();
@@ -200,6 +207,67 @@ const Subscriptions = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SUBSCRIPTIONS_STORAGE_KEY || e.key === null) {
+        loadSubscriptions();
+      }
+      if (e.key === CUSTOMERS_STORAGE_KEY || e.key === null) {
+        loadCustomers();
+      }
+      if (e.key === SERVICES_STORAGE_KEY || e.key === null) {
+        loadServices();
+      }
+      if (e.key === PAYMENT_METHODS_STORAGE_KEY || e.key === null) {
+        const raw = localStorage.getItem(PAYMENT_METHODS_STORAGE_KEY);
+        if (!raw) {
+          setPaymentMethods(defaultPaymentMethods);
+          return;
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          setPaymentMethods(parsed);
+        } catch {
+          setPaymentMethods(defaultPaymentMethods);
+        }
+      }
+    };
+
+    const onCloudStateUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ keys?: string[] }>;
+      const changed = new Set(customEvent?.detail?.keys || []);
+      if (changed.has(SUBSCRIPTIONS_STORAGE_KEY)) {
+        loadSubscriptions();
+      }
+      if (changed.has(CUSTOMERS_STORAGE_KEY)) {
+        loadCustomers();
+      }
+      if (changed.has(SERVICES_STORAGE_KEY)) {
+        loadServices();
+      }
+      if (changed.has(PAYMENT_METHODS_STORAGE_KEY)) {
+        const raw = localStorage.getItem(PAYMENT_METHODS_STORAGE_KEY);
+        if (!raw) {
+          setPaymentMethods(defaultPaymentMethods);
+          return;
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          setPaymentMethods(parsed);
+        } catch {
+          setPaymentMethods(defaultPaymentMethods);
+        }
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
+    };
+  }, []);
+
   // Refresh customers when modal opens
   useEffect(() => {
     if (isModalOpen) {
@@ -214,7 +282,9 @@ const Subscriptions = () => {
       localStorage.removeItem(SUBSCRIPTIONS_STORAGE_KEY);
       return;
     }
-    localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptions));
+    const nextSerialized = JSON.stringify(subscriptions);
+    if (localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY) === nextSerialized) return;
+    localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, nextSerialized);
   }, [subscriptions]);
 
   // Send WhatsApp notification to customer
@@ -272,7 +342,7 @@ const Subscriptions = () => {
     const customer = customers.find(c => c.id === subscriptionData.customerId);
     const customerWhatsapp = customer?.whatsapp?.replace(/[^0-9]/g, '') || '';
     
-    setSubscriptions([newSubscription, ...subscriptions]);
+    setSubscriptions((prev) => [newSubscription, ...prev]);
     
     // Create invoice from subscription
     const invoice = createInvoiceFromSubscription(newSubscription);
@@ -335,6 +405,7 @@ const Subscriptions = () => {
       // Delete subscription
       const updatedSubscriptions = subscriptions.filter(s => s.id !== selectedSubscription.id);
       setSubscriptions(updatedSubscriptions);
+      localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(updatedSubscriptions));
       if (updatedSubscriptions.length === 0) {
         localStorage.removeItem(SUBSCRIPTIONS_STORAGE_KEY);
       }

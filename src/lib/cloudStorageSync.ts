@@ -4,6 +4,7 @@ import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore'
 const CLOUD_STORAGE_COLLECTION = 'app_state';
 const CLOUD_SYNC_META_KEY = '__cloud_sync_meta__';
 const CLOUD_HEALTHCHECK_DOC = 'healthcheck_probe';
+export const CLOUD_STATE_UPDATED_EVENT = 'cloud-state-updated';
 
 let syncInitialized = false;
 let patchInstalled = false;
@@ -166,18 +167,29 @@ const reconcileWithCloud = async (): Promise<void> => {
   isHydrating = true;
   try {
     const cloudSnapshot = await readCloudState();
+    const changedKeys = new Set<string>();
 
     // Remove any local app_* key that does not exist in cloud.
     const localSnapshot = getLocalSyncableSnapshot();
-    localSnapshot.forEach((_, key) => {
+    localSnapshot.forEach((localValue, key) => {
       if (!cloudSnapshot.has(key)) {
         localStorage.removeItem(key);
+        changedKeys.add(key);
+        return;
+      }
+
+      const cloudEntry = cloudSnapshot.get(key);
+      if (cloudEntry && cloudEntry.value !== localValue) {
+        changedKeys.add(key);
       }
     });
 
     // Apply cloud snapshot to local cache.
     const meta: SyncMetaState = {};
     cloudSnapshot.forEach((cloud, key) => {
+      if (localStorage.getItem(key) !== cloud.value) {
+        changedKeys.add(key);
+      }
       localStorage.setItem(key, cloud.value);
       meta[key] = { updatedAt: cloud.updatedAt || Date.now(), deleted: false };
     });
@@ -191,6 +203,16 @@ const reconcileWithCloud = async (): Promise<void> => {
     });
 
     saveSyncMeta(meta);
+
+    if (typeof window !== 'undefined' && changedKeys.size > 0) {
+      window.dispatchEvent(
+        new CustomEvent(CLOUD_STATE_UPDATED_EVENT, {
+          detail: {
+            keys: Array.from(changedKeys),
+          },
+        })
+      );
+    }
   } finally {
     isHydrating = false;
   }
