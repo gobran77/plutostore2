@@ -291,7 +291,7 @@ export const syncCloudStorageNow = async (): Promise<void> => {
   await readQueue;
 };
 
-export const startCloudStoragePolling = (intervalMs: number = 4000): void => {
+export const startCloudStoragePolling = (intervalMs: number = 1500): void => {
   if (pollingStarted) return;
   pollingStarted = true;
 
@@ -302,7 +302,7 @@ export const startCloudStoragePolling = (intervalMs: number = 4000): void => {
   };
 
   if (typeof window !== 'undefined') {
-    pollingTimer = window.setInterval(tick, Math.max(2000, intervalMs));
+    pollingTimer = window.setInterval(tick, Math.max(800, intervalMs));
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) tick();
     });

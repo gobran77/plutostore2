@@ -11,7 +11,7 @@ import {
 import { addCustomerActivity } from '@/lib/customerActivityLog';
 import { fixTextEncoding } from '@/lib/textEncoding';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
-import { CLOUD_STATE_UPDATED_EVENT } from '@/lib/cloudStorageSync';
+import { CLOUD_STATE_UPDATED_EVENT, syncCloudStorageNow } from '@/lib/cloudStorageSync';
 
 // Service requests are stored in localStorage.
 
@@ -113,6 +113,12 @@ const loadArray = <T,>(key: string): T[] => {
 
 const saveArray = (key: string, value: any[]) => {
   localStorage.setItem(key, JSON.stringify(value));
+};
+
+const flushCloudQuickly = () => {
+  syncCloudStorageNow().catch((error) => {
+    console.error('Service requests cloud flush failed:', error);
+  });
 };
 
 const getBalanceColumn = (currency: string): keyof LocalCustomerAccount => {
@@ -488,6 +494,7 @@ export function useServiceRequests() {
       const reqs = loadArray<ServiceRequest>(REQUESTS_KEY);
       reqs.unshift(req);
       saveArray(REQUESTS_KEY, reqs);
+      flushCloudQuickly();
 
       toast.success('تم إرسال طلب الخدمة وخصم الرصيد بنجاح');
       refetch();
@@ -551,6 +558,7 @@ export function useServiceRequests() {
         updated_at: new Date().toISOString(),
       };
       saveArray(REQUESTS_KEY, reqs);
+      flushCloudQuickly();
 
       const statusMessages: Record<ServiceRequestStatus, string> = {
         pending: 'تم تحويل الطلب إلى معلق',
@@ -579,6 +587,7 @@ export function useServiceRequests() {
 
       const reqs = loadArray<ServiceRequest>(REQUESTS_KEY).filter((r) => r.id !== id);
       saveArray(REQUESTS_KEY, reqs);
+      flushCloudQuickly();
       toast.success('تم حذف الطلب');
       refetch();
       return true;
