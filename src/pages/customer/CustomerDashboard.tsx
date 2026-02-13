@@ -160,7 +160,10 @@ export default function CustomerDashboard() {
       if (!Array.isArray(parsed)) return [];
 
       return parsed
-        .filter((s: any) => String(s?.customerId || '') === customerId)
+        .filter((s: any) => {
+          const ownerId = String(s?.customerId || s?.customer_id || '').trim();
+          return ownerId === String(customerId).trim();
+        })
         .map((s: any) => {
           const start = s?.startDate ? new Date(s.startDate) : (s?.start_date ? new Date(s.start_date) : new Date());
           const end = s?.endDate ? new Date(s.endDate) : (s?.end_date ? new Date(s.end_date) : new Date());

@@ -184,9 +184,10 @@ const createSubscriptionFromRequest = (request: ServiceRequest, activation?: Act
   const customerName = getCustomerName(request.customer_id, request.customer?.name);
   const { cost, accountType } = getServiceMeta(request);
 
-  const newSubscription: Subscription & { sourceRequestId?: string } = {
+  const newSubscription: (Subscription & { sourceRequestId?: string }) & { customer_id?: string } = {
     id: `sub_${Date.now()}`,
     customerId: request.customer_id,
+    customer_id: request.customer_id,
     customerName,
     services: [
       {
