@@ -96,9 +96,21 @@ interface CustomerPaymentRecord {
   methodName?: string;
 }
 
+interface CustomerServiceRequest {
+  id: string;
+  service_name: string;
+  period_name: string;
+  price: number;
+  currency: string;
+  status: string;
+  admin_notes?: string | null;
+  created_at: string;
+}
+
 export default function CustomerDashboard() {
   const [customer, setCustomer] = useState<CustomerSession | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [serviceRequests, setServiceRequests] = useState<CustomerServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'home' | 'subscriptions' | 'credentials' | 'services' | 'report' | 'tickets' | 'settings'>('home');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -119,6 +131,7 @@ export default function CustomerDashboard() {
   const PAYMENT_METHODS_STORAGE_KEY = 'app_payment_methods';
   const PAYMENTS_STORAGE_KEY = 'app_payments';
   const CUSTOMER_ACTIVITY_KEY = 'app_customer_activity';
+  const SERVICE_REQUESTS_STORAGE_KEY = 'app_service_requests';
 
   const getOutstandingDebtByCurrency = (customerId: string): CustomerBalances => {
     try {
@@ -244,6 +257,29 @@ export default function CustomerDashboard() {
     setAccountActivities(getCustomerActivity(customerId, 100));
   };
 
+  const loadCustomerServiceRequests = (customerId: string) => {
+    try {
+      const raw = localStorage.getItem(SERVICE_REQUESTS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const list = (Array.isArray(parsed) ? parsed : [])
+        .filter((r: any) => String(r?.customer_id || '') === String(customerId))
+        .map((r: any) => ({
+          id: String(r?.id || ''),
+          service_name: String(r?.service_name || 'خدمة'),
+          period_name: String(r?.period_name || ''),
+          price: Number(r?.price || 0),
+          currency: String(r?.currency || 'SAR'),
+          status: String(r?.status || 'pending'),
+          admin_notes: r?.admin_notes ? String(r.admin_notes) : null,
+          created_at: r?.created_at ? String(r.created_at) : new Date().toISOString(),
+        }))
+        .sort((a: CustomerServiceRequest, b: CustomerServiceRequest) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setServiceRequests(list);
+    } catch {
+      setServiceRequests([]);
+    }
+  };
+
   const refreshPasskeyState = (customerId: string) => {
     const status = getCustomerPasskeyStatus(customerId);
     setPasskeyConfigured(status.configured);
@@ -302,6 +338,7 @@ export default function CustomerDashboard() {
         loadPaymentMethods();
         loadCustomerPayments(normalized.id, normalized.name);
         loadAccountActivities(normalized.id);
+        loadCustomerServiceRequests(normalized.id);
       } catch (error) {
         console.error('Error validating customer session:', error);
         navigate('/customer', { replace: true });
@@ -407,6 +444,9 @@ export default function CustomerDashboard() {
       if (e.key === CUSTOMER_ACTIVITY_KEY) {
         loadAccountActivities(customer.id);
       }
+      if (e.key === SERVICE_REQUESTS_STORAGE_KEY) {
+        loadCustomerServiceRequests(customer.id);
+      }
     };
 
     const onCloudStateUpdated = (event: Event) => {
@@ -426,6 +466,9 @@ export default function CustomerDashboard() {
       }
       if (changed.has(CUSTOMER_ACTIVITY_KEY)) {
         loadAccountActivities(customer.id);
+      }
+      if (changed.has(SERVICE_REQUESTS_STORAGE_KEY)) {
+        loadCustomerServiceRequests(customer.id);
       }
     };
 
@@ -461,6 +504,7 @@ export default function CustomerDashboard() {
       loadPaymentMethods();
       loadCustomerPayments(customer.id, customer.name);
       loadAccountActivities(customer.id);
+      loadCustomerServiceRequests(customer.id);
       refreshPasskeyState(customer.id);
     }
   };
@@ -607,6 +651,26 @@ export default function CustomerDashboard() {
       return { icon: AlertTriangle, color: 'text-warning', bgColor: 'bg-warning/10', text: 'ينتهي قريباً' };
     }
     return { icon: CheckCircle, color: 'text-success', bgColor: 'bg-success/10', text: 'نشط' };
+  };
+
+  const getRequestStatusInfo = (status: string) => {
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'processing') {
+      return { icon: RefreshCw, color: 'text-info', bgColor: 'bg-info/10', text: 'جاري المعالجة' };
+    }
+    if (normalized === 'approved') {
+      return { icon: CheckCircle, color: 'text-success', bgColor: 'bg-success/10', text: 'مقبول' };
+    }
+    if (normalized === 'activated') {
+      return { icon: Zap, color: 'text-primary', bgColor: 'bg-primary/10', text: 'تم التفعيل' };
+    }
+    if (normalized === 'rejected') {
+      return { icon: XCircle, color: 'text-destructive', bgColor: 'bg-destructive/10', text: 'مرفوض' };
+    }
+    if (normalized === 'failed') {
+      return { icon: XCircle, color: 'text-destructive', bgColor: 'bg-destructive/10', text: 'فشل' };
+    }
+    return { icon: Clock, color: 'text-warning', bgColor: 'bg-warning/10', text: 'معلق' };
   };
 
   // Get total balance across all currencies (for display purposes)
@@ -1046,11 +1110,50 @@ export default function CustomerDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {subscriptions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  لا توجد اشتراكات حالياً
-                </p>
-              ) : (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">طلبات الخدمات</p>
+                {serviceRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">لا توجد طلبات خدمة حالياً.</p>
+                ) : (
+                  serviceRequests.slice(0, 20).map((req) => {
+                    const info = getRequestStatusInfo(req.status);
+                    const Icon = info.icon;
+                    const showReason = req.status === 'rejected' || req.status === 'failed';
+                    return (
+                      <div key={req.id} className="border rounded-xl p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium">{req.service_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {req.period_name ? `${req.period_name} - ` : ''}{req.price} {req.currency}
+                            </p>
+                          </div>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${info.bgColor} ${info.color}`}>
+                            <Icon className="w-3 h-3" />
+                            {info.text}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(req.created_at), 'dd MMM yyyy - HH:mm', { locale: ar })}
+                        </p>
+                        {showReason && req.admin_notes && req.admin_notes.trim().length > 0 && (
+                          <div className="text-xs rounded-lg bg-destructive/5 text-destructive px-2 py-1 border border-destructive/20">
+                            سبب {req.status === 'rejected' ? 'الرفض' : 'الفشل'}: {req.admin_notes}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="pt-2 border-t border-border space-y-3">
+                <p className="text-sm font-semibold">الاشتراكات المفعلة</p>
+                {subscriptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    لا توجد اشتراكات مفعلة حالياً
+                  </p>
+                ) : (
                 subscriptions.map((sub) => {
                   const daysRemaining = getDaysRemaining(sub.end_date);
                   const status = getStatusInfo(sub);
@@ -1134,6 +1237,7 @@ export default function CustomerDashboard() {
                   );
                 })
               )}
+              </div>
             </CardContent>
           </Card>
         )}
