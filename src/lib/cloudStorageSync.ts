@@ -3,6 +3,7 @@ import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore'
 
 const CLOUD_STORAGE_COLLECTION = 'app_state';
 const CLOUD_SYNC_META_KEY = '__cloud_sync_meta__';
+const CLOUD_HEALTHCHECK_DOC = '__healthcheck__';
 
 let syncInitialized = false;
 let patchInstalled = false;
@@ -153,17 +154,42 @@ const readCloudState = async (): Promise<Map<string, CloudStateEntry>> => {
   return cloudState;
 };
 
-export const initializeCloudStorageSync = async (): Promise<void> => {
+export const verifyCloudStorageAccess = async (): Promise<void> => {
+  if (!isFirebaseConfigured || !db) {
+    throw new Error('firebase_not_configured');
+  }
+
+  // Verify both read and write access to app_state.
+  await getDocs(collection(db, CLOUD_STORAGE_COLLECTION));
+  await setDoc(
+    doc(db, CLOUD_STORAGE_COLLECTION, CLOUD_HEALTHCHECK_DOC),
+    { value: 'ok', updated_at: new Date().toISOString() },
+    { merge: true }
+  );
+  await deleteDoc(doc(db, CLOUD_STORAGE_COLLECTION, CLOUD_HEALTHCHECK_DOC));
+};
+
+export const initializeCloudStorageSync = async (
+  options: { requireCloud?: boolean } = {}
+): Promise<void> => {
+  const requireCloud = options.requireCloud ?? false;
   if (syncInitialized) return;
-  syncInitialized = true;
-  installLocalStoragePatch();
 
   if (!isFirebaseConfigured || !db) {
+    if (requireCloud) {
+      throw new Error('firebase_not_configured');
+    }
+    syncInitialized = true;
+    installLocalStoragePatch();
     console.warn('Firebase is not configured. App data remains local.');
     return;
   }
 
   try {
+    // Ensure Firestore access before enabling app state sync.
+    await verifyCloudStorageAccess();
+    syncInitialized = true;
+    installLocalStoragePatch();
     isHydrating = true;
 
     const localSnapshot = getLocalSyncableSnapshot();
@@ -212,6 +238,9 @@ export const initializeCloudStorageSync = async (): Promise<void> => {
 
     saveSyncMeta(meta);
   } catch (error) {
+    if (requireCloud) throw error;
+    syncInitialized = true;
+    installLocalStoragePatch();
     console.error('Failed to initialize cloud storage sync:', error);
   } finally {
     isHydrating = false;

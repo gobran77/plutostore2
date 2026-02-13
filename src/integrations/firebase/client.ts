@@ -19,7 +19,17 @@ export const isFirebaseConfigured = Boolean(
     firebaseConfig.appId
 );
 
+export const missingFirebaseEnvKeys = [
+  ['VITE_FIREBASE_API_KEY', firebaseConfig.apiKey],
+  ['VITE_FIREBASE_AUTH_DOMAIN', firebaseConfig.authDomain],
+  ['VITE_FIREBASE_PROJECT_ID', firebaseConfig.projectId],
+  ['VITE_FIREBASE_STORAGE_BUCKET', firebaseConfig.storageBucket],
+  ['VITE_FIREBASE_MESSAGING_SENDER_ID', firebaseConfig.messagingSenderId],
+  ['VITE_FIREBASE_APP_ID', firebaseConfig.appId],
+]
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
 const app = isFirebaseConfigured ? initializeApp(firebaseConfig as Record<string, string>) : null;
 
 export const db = app ? getFirestore(app) : null;
-
