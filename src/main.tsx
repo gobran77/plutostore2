@@ -15,10 +15,11 @@ const bootstrap = async () => {
     console.error("Firebase bootstrap failed:", error);
 
     const reason = String(error?.message || "");
+    const errorCode = String(error?.code || "");
     const isConfigError = reason === "firebase_not_configured";
     const details = isConfigError
       ? `Missing env vars: ${missingFirebaseEnvKeys.join(", ")}`
-      : "Firestore access failed. Check Firestore rules for app_state and customer_accounts.";
+      : `Firestore access failed (${errorCode || "unknown"}). Check Firestore rules and browser/network blocking for firestore.googleapis.com.`;
 
     root.render(
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", fontFamily: "system-ui" }}>
