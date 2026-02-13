@@ -11,6 +11,7 @@ import {
 import { addCustomerActivity } from '@/lib/customerActivityLog';
 import { fixTextEncoding } from '@/lib/textEncoding';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
+import { CLOUD_STATE_UPDATED_EVENT } from '@/lib/cloudStorageSync';
 
 // Service requests are stored in localStorage.
 
@@ -414,8 +415,24 @@ export function useServiceRequests() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === REQUESTS_KEY || e.key === ACCOUNTS_KEY) refetch();
     };
+    const onCloudStateUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ keys?: string[] }>;
+      const changed = new Set(customEvent?.detail?.keys || []);
+      if (changed.has(REQUESTS_KEY) || changed.has(ACCOUNTS_KEY)) {
+        refetch();
+      }
+    };
+    const onCustomerAccountsUpdated = () => {
+      refetch();
+    };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
+    window.addEventListener('customer-accounts-updated', onCustomerAccountsUpdated);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
+      window.removeEventListener('customer-accounts-updated', onCustomerAccountsUpdated);
+    };
   }, []);
 
   const pendingCount = useMemo(
