@@ -27,8 +27,11 @@ import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customer
 import { addCustomerActivity } from '@/lib/customerActivityLog';
 import { fixTextEncoding } from '@/lib/textEncoding';
 import { CLOUD_STATE_UPDATED_EVENT } from '@/lib/cloudStorageSync';
+import { db } from '@/integrations/firebase/client';
+import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
 
 const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
+const SUBSCRIPTIONS_COLLECTION = 'service_subscriptions_items';
 const SERVICES_STORAGE_KEY = 'app_services';
 const CUSTOMERS_STORAGE_KEY = 'app_customers';
 const PAYMENT_METHODS_STORAGE_KEY = 'app_payment_methods';
@@ -108,7 +111,63 @@ const Subscriptions = () => {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [subscriptionsHydrated, setSubscriptionsHydrated] = useState(false);
 
-  const loadSubscriptions = () => {
+  const normalizeSubscription = (s: any): Subscription => {
+    const totalPrice = Number(s?.totalPrice || 0);
+    const paidAmountRaw =
+      typeof s?.paidAmount === 'number'
+        ? s.paidAmount
+        : typeof s?.paid_amount === 'number'
+        ? s.paid_amount
+        : Number(s?.paidAmount ?? s?.paid_amount);
+    const paidAmount = Number.isFinite(paidAmountRaw) ? paidAmountRaw : totalPrice;
+    const hasOutstanding = totalPrice > paidAmount;
+    const paymentStatus =
+      s?.paymentStatus ||
+      s?.payment_status ||
+      (hasOutstanding ? (paidAmount <= 0 ? 'deferred' : 'partial') : 'paid');
+
+    return {
+      ...s,
+      customerName: fixTextEncoding(String(s?.customerName || '')),
+      startDate: new Date(s.startDate),
+      endDate: new Date(s.endDate),
+      dueDate: s.dueDate ? new Date(s.dueDate) : undefined,
+      paymentNotes: s?.paymentNotes ? fixTextEncoding(String(s.paymentNotes)) : undefined,
+      paymentMethod: s?.paymentMethod
+        ? {
+            ...s.paymentMethod,
+            name: fixTextEncoding(String(s.paymentMethod?.name || '')),
+            details: s.paymentMethod?.details ? fixTextEncoding(String(s.paymentMethod.details)) : undefined,
+          }
+        : undefined,
+      services: Array.isArray(s?.services)
+        ? s.services.map((x: any) => ({
+            ...x,
+            serviceName: fixTextEncoding(String(x?.serviceName || '')),
+          }))
+        : [],
+      paymentStatus,
+      paidAmount,
+    };
+  };
+
+  const loadSubscriptions = async () => {
+    if (db) {
+      try {
+        const snapshot = await getDocs(collection(db, SUBSCRIPTIONS_COLLECTION));
+        if (!snapshot.empty) {
+          const rows = snapshot.docs.map((d) => ({ ...d.data(), id: String((d.data() as any)?.id || d.id) }));
+          const subscriptionsWithDates = rows.map(normalizeSubscription);
+          setSubscriptions(subscriptionsWithDates);
+          setSubscriptionsHydrated(true);
+          localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptionsWithDates));
+          return;
+        }
+      } catch (e) {
+        console.error('Error loading subscriptions from Firestore:', e);
+      }
+    }
+
     const savedSubscriptions = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
     if (!savedSubscriptions) {
       setSubscriptions([]);
@@ -117,46 +176,7 @@ const Subscriptions = () => {
     }
     try {
       const parsed = JSON.parse(savedSubscriptions);
-      const subscriptionsWithDates = parsed.map((s: any) => {
-        const totalPrice = Number(s?.totalPrice || 0);
-        const paidAmountRaw =
-          typeof s?.paidAmount === 'number'
-            ? s.paidAmount
-            : typeof s?.paid_amount === 'number'
-            ? s.paid_amount
-            : Number(s?.paidAmount ?? s?.paid_amount);
-        const paidAmount = Number.isFinite(paidAmountRaw) ? paidAmountRaw : totalPrice;
-        const hasOutstanding = totalPrice > paidAmount;
-        const paymentStatus =
-          s?.paymentStatus ||
-          s?.payment_status ||
-          (hasOutstanding ? (paidAmount <= 0 ? 'deferred' : 'partial') : 'paid');
-
-        return ({
-        ...s,
-        customerName: fixTextEncoding(String(s?.customerName || '')),
-        startDate: new Date(s.startDate),
-        endDate: new Date(s.endDate),
-        dueDate: s.dueDate ? new Date(s.dueDate) : undefined,
-        paymentNotes: s?.paymentNotes ? fixTextEncoding(String(s.paymentNotes)) : undefined,
-        paymentMethod: s?.paymentMethod
-          ? {
-              ...s.paymentMethod,
-              name: fixTextEncoding(String(s.paymentMethod?.name || '')),
-              details: s.paymentMethod?.details ? fixTextEncoding(String(s.paymentMethod.details)) : undefined,
-            }
-          : undefined,
-        services: Array.isArray(s?.services)
-          ? s.services.map((x: any) => ({
-              ...x,
-              serviceName: fixTextEncoding(String(x?.serviceName || '')),
-            }))
-          : [],
-        paymentStatus,
-        // Keep 0 for deferred subscriptions; don't coerce to totalPrice on refresh.
-        paidAmount,
-      });
-      });
+      const subscriptionsWithDates = parsed.map((s: any) => normalizeSubscription(s));
       setSubscriptions(subscriptionsWithDates);
       setSubscriptionsHydrated(true);
     } catch (e) {
@@ -208,7 +228,7 @@ const Subscriptions = () => {
 
   // Load data on mount
   useEffect(() => {
-    loadSubscriptions();
+    void loadSubscriptions();
 
     // Load customers from localStorage
     loadCustomers();
@@ -231,7 +251,7 @@ const Subscriptions = () => {
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === SUBSCRIPTIONS_STORAGE_KEY || e.key === null) {
-        loadSubscriptions();
+        void loadSubscriptions();
       }
       if (e.key === CUSTOMERS_STORAGE_KEY || e.key === null) {
         loadCustomers();
@@ -258,7 +278,7 @@ const Subscriptions = () => {
       const customEvent = event as CustomEvent<{ keys?: string[] }>;
       const changed = new Set(customEvent?.detail?.keys || []);
       if (changed.has(SUBSCRIPTIONS_STORAGE_KEY)) {
-        loadSubscriptions();
+        void loadSubscriptions();
       }
       if (changed.has(CUSTOMERS_STORAGE_KEY)) {
         loadCustomers();
@@ -308,6 +328,49 @@ const Subscriptions = () => {
     const nextSerialized = JSON.stringify(subscriptions);
     if (localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY) === nextSerialized) return;
     localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, nextSerialized);
+  }, [subscriptions, subscriptionsHydrated]);
+
+  useEffect(() => {
+    if (!subscriptionsHydrated || !db) return;
+
+    const toIso = (value: any) =>
+      value instanceof Date ? value.toISOString() : new Date(value || Date.now()).toISOString();
+
+    const serialize = (sub: Subscription) => ({
+      ...sub,
+      startDate: toIso(sub.startDate),
+      endDate: toIso(sub.endDate),
+      dueDate: sub.dueDate ? toIso(sub.dueDate) : null,
+      updated_at: new Date().toISOString(),
+    });
+
+    let cancelled = false;
+    const syncSubscriptions = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, SUBSCRIPTIONS_COLLECTION));
+        if (cancelled) return;
+
+        const nextIds = new Set(subscriptions.map((s) => String(s.id)));
+        await Promise.all(
+          subscriptions.map((sub) =>
+            setDoc(doc(db, SUBSCRIPTIONS_COLLECTION, String(sub.id)), serialize(sub), { merge: true })
+          )
+        );
+
+        const deletes: Promise<void>[] = [];
+        snapshot.docs.forEach((d) => {
+          if (!nextIds.has(d.id)) deletes.push(deleteDoc(doc(db, SUBSCRIPTIONS_COLLECTION, d.id)));
+        });
+        if (deletes.length > 0) await Promise.all(deletes);
+      } catch (error) {
+        console.error('Failed to sync subscriptions to Firestore:', error);
+      }
+    };
+
+    void syncSubscriptions();
+    return () => {
+      cancelled = true;
+    };
   }, [subscriptions, subscriptionsHydrated]);
 
   // Send WhatsApp notification to customer
@@ -411,7 +474,7 @@ const Subscriptions = () => {
       });
       const updatedPayments = payments.filter(p => p.invoiceId !== selectedSubscription.id);
       if (updatedPayments.length === 0) {
-        localStorage.removeItem('app_payments');
+        savePayments([]);
       } else {
         savePayments(updatedPayments);
       }
@@ -420,7 +483,7 @@ const Subscriptions = () => {
       const invoices = loadInvoices();
       const updatedInvoices = invoices.filter(inv => inv.subscriptionId !== selectedSubscription.id);
       if (updatedInvoices.length === 0) {
-        localStorage.removeItem('app_invoices');
+        saveInvoices([]);
       } else {
         saveInvoices(updatedInvoices);
       }
