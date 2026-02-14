@@ -16,7 +16,7 @@ import { getCurrencySymbol } from '@/types/currency';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { db } from '@/integrations/firebase/client';
+import { db, firebaseProjectId } from '@/integrations/firebase/client';
 import { collection, getDocs } from 'firebase/firestore';
 
 // Storage key for services
@@ -103,9 +103,15 @@ const Services = () => {
             localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(normalized));
             return;
           }
+
+          if (!localStorage.getItem(SERVICES_STORAGE_KEY)) {
+            toast.warning(`لا توجد خدمات في Firestore (project: ${firebaseProjectId || 'unknown'})`);
+          }
         }
       } catch (e) {
         console.error('Error loading services from Firestore:', e);
+        const code = (e as any)?.code ? String((e as any).code) : 'unknown';
+        toast.error(`فشل قراءة الخدمات من Firestore (${code}) - project: ${firebaseProjectId || 'unknown'}`);
       }
 
       const savedServices = localStorage.getItem(SERVICES_STORAGE_KEY);
