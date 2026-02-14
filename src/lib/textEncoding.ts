@@ -1,4 +1,4 @@
-const MOJIBAKE_PATTERN = /[\u00C2\u00C3\u00D8\u00D9\u00E2]/;
+const MOJIBAKE_PATTERN = /[\u00C2\u00C3\u00D8\u00D9\u00DA\u00DB\u00E2\u00F0]/;
 
 export const fixTextEncoding = (value?: string | null): string => {
   if (typeof value !== 'string') return '';
