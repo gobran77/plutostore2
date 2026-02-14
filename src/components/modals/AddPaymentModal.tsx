@@ -2,15 +2,18 @@ import { useState, useEffect } from 'react';
 import { X, FileText, User } from 'lucide-react';
 import { PaymentMethodType } from './PaymentMethodsModal';
 import { toast } from 'sonner';
-import { CUSTOMER_ACCOUNTS_KEY } from '@/hooks/useCustomerPassword';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { addCustomerActivity } from '@/lib/customerActivityLog';
+import {
+  hydrateInvoicePaymentStorageFromCloud,
+  loadInvoices,
+  loadPayments,
+  saveInvoices,
+} from '@/utils/invoicePaymentUtils';
 
 type InvoiceStatus = 'paid' | 'unpaid' | 'partially_paid';
-type PaymentType = 'invoice' | 'customer_balance';
+type PaymentType = 'invoice' | 'customer_balance' | 'customer_debt';
 
-const INVOICES_STORAGE_KEY = 'app_invoices';
-const PAYMENTS_STORAGE_KEY = 'app_payments';
 const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
 
 interface AddPaymentModalProps {
@@ -81,7 +84,7 @@ export const AddPaymentModal = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    if (paymentType === 'customer_balance') {
+    if (paymentType === 'customer_balance' || paymentType === 'customer_debt') {
       loadCustomers();
       return;
     }
@@ -89,13 +92,12 @@ export const AddPaymentModal = ({
     loadOutstandingInvoices();
   }, [isOpen, paymentType]);
 
-  const loadOutstandingInvoices = () => {
+  const loadOutstandingInvoices = async () => {
     setLoadingInvoices(true);
     try {
-      const rawInvoices = localStorage.getItem(INVOICES_STORAGE_KEY);
-      const rawPayments = localStorage.getItem(PAYMENTS_STORAGE_KEY);
-      const invoices = rawInvoices ? JSON.parse(rawInvoices) : [];
-      const payments = rawPayments ? JSON.parse(rawPayments) : [];
+      await hydrateInvoicePaymentStorageFromCloud();
+      const invoices = loadInvoices();
+      const payments = loadPayments();
 
       if (!Array.isArray(invoices)) {
         setOutstandingInvoices([]);
@@ -154,8 +156,7 @@ export const AddPaymentModal = ({
   const loadCustomers = async () => {
     setLoadingCustomers(true);
     try {
-      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
-      const accounts = raw ? JSON.parse(raw) : [];
+      const accounts = await getCustomerAccounts();
       const list = (Array.isArray(accounts) ? accounts : [])
         .filter((a: any) => !a?.is_admin && a?.account_type !== 'admin')
         .filter((a: any) => a?.is_activated === true)
@@ -222,18 +223,15 @@ export const AddPaymentModal = ({
       nextPaid >= invoice.totalAmount ? 'paid' : nextPaid > 0 ? 'partially_paid' : 'unpaid';
 
     try {
-      const rawInvoices = localStorage.getItem(INVOICES_STORAGE_KEY);
-      const invoices = rawInvoices ? JSON.parse(rawInvoices) : [];
-      if (Array.isArray(invoices)) {
-        const updatedInvoices = invoices.map((inv: any) => {
-          if (String(inv?.id || '') !== invoice.id) return inv;
-          return {
-            ...inv,
-            status: nextStatus,
-          };
-        });
-        localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(updatedInvoices));
-      }
+      const invoices = loadInvoices();
+      const updatedInvoices = invoices.map((inv: any) => {
+        if (String(inv?.id || '') !== invoice.id) return inv;
+        return {
+          ...inv,
+          status: nextStatus,
+        };
+      });
+      saveInvoices(updatedInvoices as any);
     } catch (error) {
       console.error('Failed to update invoice status:', error);
     }
@@ -337,7 +335,7 @@ export const AddPaymentModal = ({
             method: selectedMethod.name,
           },
         });
-      } else {
+      } else if (paymentType === 'customer_balance') {
         if (!selectedCustomer) return;
 
         const amount = toNumber(formData.amount);
@@ -395,6 +393,71 @@ export const AddPaymentModal = ({
         });
 
         toast.success(`تم إضافة ${amount.toLocaleString()} ${currency} لرصيد ${selectedCustomer.name}`);
+      } else {
+        if (!selectedCustomer) return;
+        const amount = toNumber(formData.amount);
+        if (amount <= 0) {
+          toast.error('يرجى إدخال مبلغ صحيح');
+          return;
+        }
+
+        const currency = formData.currency;
+        const updateField = `balance_${currency.toLowerCase()}`;
+        if (!['balance_sar', 'balance_yer', 'balance_usd'].includes(updateField)) {
+          throw new Error('invalid_currency');
+        }
+
+        const accounts = await getCustomerAccounts();
+        const account = accounts.find((a: any) => String(a?.id || '') === String(selectedCustomer.id));
+        if (!account) throw new Error('account_not_found');
+        const currentBalance = toNumber((account as any)?.[updateField]);
+        const newBalance = currentBalance - amount;
+        await updateCustomerAccountRecord(String(account.id), { [updateField]: newBalance } as any);
+
+        const rawSession = localStorage.getItem('customer_session');
+        if (rawSession) {
+          const session = JSON.parse(rawSession);
+          if (String(session?.id || '') === String(selectedCustomer.id)) {
+            const nextSession = {
+              ...session,
+              balances: {
+                balance_sar: toNumber(session?.balances?.balance_sar),
+                balance_yer: toNumber(session?.balances?.balance_yer),
+                balance_usd: toNumber(session?.balances?.balance_usd),
+                [updateField]: newBalance,
+              },
+            };
+            localStorage.setItem('customer_session', JSON.stringify(nextSession));
+          }
+        }
+
+        onAdd({
+          customerId: selectedCustomer.id,
+          invoiceId: `debt_${selectedCustomer.id}_${Date.now()}`,
+          invoiceNumber: `إضافة مديونية - ${selectedCustomer.name}`,
+          customerName: selectedCustomer.name,
+          amount: -amount,
+          currency,
+          method: selectedMethod.type,
+          methodName: selectedMethod.name,
+          reference: formData.reference || formData.notes,
+          paidAt: new Date(formData.paidAt),
+          isDebtAddition: true,
+        });
+
+        addCustomerActivity({
+          customerId: selectedCustomer.id,
+          type: 'balance_subtract',
+          title: 'تمت إضافة مديونية',
+          description: `بواسطة ${selectedMethod.name}`,
+          amount,
+          currency,
+          meta: {
+            note: formData.notes || '',
+          },
+        });
+
+        toast.success(`تمت إضافة مديونية ${amount.toLocaleString()} ${currency} على ${selectedCustomer.name}`);
       }
 
       setFormData({
@@ -432,7 +495,7 @@ export const AddPaymentModal = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">نوع الدفعة</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setPaymentType('invoice')}
@@ -456,6 +519,18 @@ export const AddPaymentModal = ({
               >
                 <User className="w-5 h-5" />
                 <span className="font-medium">شحن رصيد عميل</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentType('customer_debt')}
+                className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                  paymentType === 'customer_debt'
+                    ? 'border-destructive bg-destructive/10 text-destructive'
+                    : 'border-border hover:border-muted-foreground text-muted-foreground'
+                }`}
+              >
+                <User className="w-5 h-5" />
+                <span className="font-medium">إضافة مديونية</span>
               </button>
             </div>
           </div>
@@ -623,7 +698,7 @@ export const AddPaymentModal = ({
             />
           </div>
 
-          {paymentType === 'customer_balance' && (
+          {(paymentType === 'customer_balance' || paymentType === 'customer_debt') && (
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">ملاحظات</label>
               <textarea
@@ -652,16 +727,21 @@ export const AddPaymentModal = ({
             </div>
           )}
 
-          {paymentType === 'customer_balance' && selectedCustomer && formData.amount && (
-            <div className="p-4 rounded-xl bg-success/5 border border-success/10">
+          {(paymentType === 'customer_balance' || paymentType === 'customer_debt') && selectedCustomer && formData.amount && (
+            <div className={`p-4 rounded-xl border ${paymentType === 'customer_debt' ? 'bg-destructive/5 border-destructive/10' : 'bg-success/5 border-success/10'}`}>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-muted-foreground">الرصيد الحالي ({formData.currency}):</span>
                 <span className="font-medium text-foreground">{getCustomerBalance(selectedCustomer, formData.currency).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">الرصيد بعد الإضافة:</span>
-                <span className="font-bold text-success">
-                  {(getCustomerBalance(selectedCustomer, formData.currency) + toNumber(formData.amount)).toLocaleString()} {formData.currency}
+                <span className="text-muted-foreground">
+                  {paymentType === 'customer_debt' ? 'الرصيد بعد إضافة المديونية:' : 'الرصيد بعد الإضافة:'}
+                </span>
+                <span className={`font-bold ${paymentType === 'customer_debt' ? 'text-destructive' : 'text-success'}`}>
+                  {(paymentType === 'customer_debt'
+                    ? getCustomerBalance(selectedCustomer, formData.currency) - toNumber(formData.amount)
+                    : getCustomerBalance(selectedCustomer, formData.currency) + toNumber(formData.amount)
+                  ).toLocaleString()} {formData.currency}
                 </span>
               </div>
             </div>
@@ -669,7 +749,13 @@ export const AddPaymentModal = ({
 
           <div className="flex items-center gap-3 pt-4">
             <button type="submit" className="btn-primary flex-1" disabled={submitting}>
-              {submitting ? 'جاري الحفظ...' : paymentType === 'invoice' ? 'تسجيل الدفعة' : 'شحن الرصيد'}
+              {submitting
+                ? 'جاري الحفظ...'
+                : paymentType === 'invoice'
+                ? 'تسجيل الدفعة'
+                : paymentType === 'customer_balance'
+                ? 'شحن الرصيد'
+                : 'إضافة المديونية'}
             </button>
             <button type="button" onClick={onClose} className="btn-secondary">
               إلغاء

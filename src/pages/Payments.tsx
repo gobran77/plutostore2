@@ -10,7 +10,13 @@ import { PaymentMethodsModal, PaymentMethodType, defaultPaymentMethods } from '@
 import { Payment, PaymentMethod } from '@/types';
 import { CreditCard, Banknote, Building2, Wallet, Filter, Download, Settings, Edit, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
-import { loadPayments, savePayments, updatePaymentInStorage, deletePaymentFromStorage } from '@/utils/invoicePaymentUtils';
+import {
+  hydrateInvoicePaymentStorageFromCloud,
+  loadPayments,
+  savePayments,
+  updatePaymentInStorage,
+  deletePaymentFromStorage,
+} from '@/utils/invoicePaymentUtils';
 import { addToBalance, subtractFromBalance } from '@/types/currency';
 
 const PAYMENT_METHODS_STORAGE_KEY = 'app_payment_methods';
@@ -106,10 +112,18 @@ const Payments = () => {
 
   // Load payments and payment methods from localStorage on mount
   useEffect(() => {
-    // Load payments
-    const loadedPayments = loadPayments() as ExtendedPayment[];
-    setPayments(loadedPayments);
-    loadDeferredDebts();
+    const bootstrap = async () => {
+      await hydrateInvoicePaymentStorageFromCloud();
+      const loadedPayments = loadPayments() as ExtendedPayment[];
+      setPayments(loadedPayments);
+      loadDeferredDebts();
+    };
+    bootstrap().catch((error) => {
+      console.error('Failed to initialize payments from cloud:', error);
+      const loadedPayments = loadPayments() as ExtendedPayment[];
+      setPayments(loadedPayments);
+      loadDeferredDebts();
+    });
 
     // Load payment methods
     const savedMethods = localStorage.getItem(PAYMENT_METHODS_STORAGE_KEY);
@@ -147,8 +161,10 @@ const Payments = () => {
     setPayments(updated);
     savePayments(updated);
     
-    // Add to currency balance
-    addToBalance(paymentData.currency, paymentData.amount);
+    // Debt entries are bookkeeping only and should not change cash balance.
+    if (!paymentData?.isDebtAddition) {
+      addToBalance(paymentData.currency, paymentData.amount);
+    }
     loadDeferredDebts();
     
     toast.success('تم تسجيل الدفعة بنجاح');
@@ -165,8 +181,10 @@ const Payments = () => {
 
   const handleDeletePayment = () => {
     if (selectedPayment) {
-      // Subtract from currency balance when deleting payment
-      subtractFromBalance(selectedPayment.currency, selectedPayment.amount);
+      // Revert cash-balance effect only for real incoming payments.
+      if (!(selectedPayment as any)?.isDebtAddition) {
+        subtractFromBalance(selectedPayment.currency, selectedPayment.amount);
+      }
       
       const updated = payments.filter(p => p.id !== selectedPayment.id);
       setPayments(updated);
@@ -223,7 +241,7 @@ const Payments = () => {
       key: 'amount',
       header: 'المبلغ',
       render: (payment: ExtendedPayment) => (
-        <span className="font-bold text-foreground">
+        <span className={`font-bold ${payment.amount < 0 ? 'text-destructive' : 'text-foreground'}`}>
           {payment.amount.toLocaleString()} {payment.currency}
         </span>
       ),

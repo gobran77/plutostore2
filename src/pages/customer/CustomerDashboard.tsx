@@ -391,9 +391,19 @@ export default function CustomerDashboard() {
 
       // Keep positive credit as-is. Normalize stale negative debt to actual outstanding debt.
       const nextBalances: CustomerBalances = {
-        balance_sar: storedBalances.balance_sar < 0 ? -debt.balance_sar : storedBalances.balance_sar,
-        balance_yer: storedBalances.balance_yer < 0 ? -debt.balance_yer : storedBalances.balance_yer,
-        balance_usd: storedBalances.balance_usd < 0 ? -debt.balance_usd : storedBalances.balance_usd,
+        // If stored balance is zero/negative, enforce at least current outstanding debt as negative balance.
+        balance_sar:
+          storedBalances.balance_sar <= 0
+            ? Math.min(storedBalances.balance_sar, -debt.balance_sar)
+            : storedBalances.balance_sar,
+        balance_yer:
+          storedBalances.balance_yer <= 0
+            ? Math.min(storedBalances.balance_yer, -debt.balance_yer)
+            : storedBalances.balance_yer,
+        balance_usd:
+          storedBalances.balance_usd <= 0
+            ? Math.min(storedBalances.balance_usd, -debt.balance_usd)
+            : storedBalances.balance_usd,
       };
 
       const shouldPatchAccount =
