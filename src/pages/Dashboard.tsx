@@ -72,14 +72,30 @@ const Dashboard = () => {
     if (savedSubscriptions) {
       try {
         const parsed = JSON.parse(savedSubscriptions);
-        const subscriptionsWithDates = parsed.map((s: any) => ({
-          ...s,
-          startDate: new Date(s.startDate),
-          endDate: new Date(s.endDate),
-          dueDate: s.dueDate ? new Date(s.dueDate) : undefined,
-          paymentStatus: s.paymentStatus || 'paid',
-          paidAmount: s.paidAmount || s.totalPrice,
-        }));
+        const subscriptionsWithDates = parsed.map((s: any) => {
+          const totalPrice = Number(s?.totalPrice || 0);
+          const paidAmountRaw =
+            typeof s?.paidAmount === 'number'
+              ? s.paidAmount
+              : typeof s?.paid_amount === 'number'
+              ? s.paid_amount
+              : Number(s?.paidAmount ?? s?.paid_amount);
+          const paidAmount = Number.isFinite(paidAmountRaw) ? paidAmountRaw : totalPrice;
+          const hasOutstanding = totalPrice > paidAmount;
+          const paymentStatus =
+            s?.paymentStatus ||
+            s?.payment_status ||
+            (hasOutstanding ? (paidAmount <= 0 ? 'deferred' : 'partial') : 'paid');
+
+          return {
+            ...s,
+            startDate: new Date(s.startDate),
+            endDate: new Date(s.endDate),
+            dueDate: s.dueDate ? new Date(s.dueDate) : undefined,
+            paymentStatus,
+            paidAmount,
+          };
+        });
         setSubscriptions(subscriptionsWithDates);
       } catch (e) {
         console.error('Error loading subscriptions:', e);

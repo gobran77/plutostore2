@@ -119,12 +119,18 @@ const Subscriptions = () => {
       const parsed = JSON.parse(savedSubscriptions);
       const subscriptionsWithDates = parsed.map((s: any) => {
         const totalPrice = Number(s?.totalPrice || 0);
-        const paidAmount =
+        const paidAmountRaw =
           typeof s?.paidAmount === 'number'
             ? s.paidAmount
             : typeof s?.paid_amount === 'number'
             ? s.paid_amount
-            : totalPrice;
+            : Number(s?.paidAmount ?? s?.paid_amount);
+        const paidAmount = Number.isFinite(paidAmountRaw) ? paidAmountRaw : totalPrice;
+        const hasOutstanding = totalPrice > paidAmount;
+        const paymentStatus =
+          s?.paymentStatus ||
+          s?.payment_status ||
+          (hasOutstanding ? (paidAmount <= 0 ? 'deferred' : 'partial') : 'paid');
 
         return ({
         ...s,
@@ -146,7 +152,7 @@ const Subscriptions = () => {
               serviceName: fixTextEncoding(String(x?.serviceName || '')),
             }))
           : [],
-        paymentStatus: s.paymentStatus || 'paid',
+        paymentStatus,
         // Keep 0 for deferred subscriptions; don't coerce to totalPrice on refresh.
         paidAmount,
       });

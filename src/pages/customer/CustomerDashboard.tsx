@@ -181,6 +181,20 @@ export default function CustomerDashboard() {
           const start = s?.startDate ? new Date(s.startDate) : (s?.start_date ? new Date(s.start_date) : new Date());
           const end = s?.endDate ? new Date(s.endDate) : (s?.end_date ? new Date(s.end_date) : new Date());
           const due = s?.dueDate ? new Date(s.dueDate) : (s?.due_date ? new Date(s.due_date) : null);
+          const totalPrice = Number(s?.totalPrice ?? s?.price ?? 0);
+          const paidAmountRaw =
+            typeof s?.paidAmount === 'number'
+              ? s.paidAmount
+              : typeof s?.paid_amount === 'number'
+              ? s.paid_amount
+              : Number(s?.paidAmount ?? s?.paid_amount);
+          const paidAmount = Number.isFinite(paidAmountRaw) ? paidAmountRaw : 0;
+          const hasOutstanding = totalPrice > paidAmount;
+          const paymentStatus = String(
+            s?.paymentStatus ||
+              s?.payment_status ||
+              (hasOutstanding ? (paidAmount <= 0 ? 'deferred' : 'partial') : 'paid')
+          );
 
           const services = Array.isArray(s?.services) ? s.services : [];
           const serviceName = services.length > 0
@@ -190,10 +204,10 @@ export default function CustomerDashboard() {
           return {
             id: String(s?.id || `${Date.now()}`),
             service_name: serviceName || 'خدمة',
-            price: Number(s?.totalPrice ?? s?.price ?? 0),
+            price: totalPrice,
             currency: String(s?.currency || 'SAR'),
-            payment_status: s?.paymentStatus ? String(s.paymentStatus) : (s?.payment_status ? String(s.payment_status) : null),
-            paid_amount: typeof s?.paidAmount === 'number' ? s.paidAmount : (typeof s?.paid_amount === 'number' ? s.paid_amount : null),
+            payment_status: paymentStatus,
+            paid_amount: paidAmount,
             due_date: due ? due.toISOString() : null,
             payment_notes: s?.paymentNotes ? String(s.paymentNotes) : (s?.payment_notes ? String(s.payment_notes) : null),
             start_date: start.toISOString(),
