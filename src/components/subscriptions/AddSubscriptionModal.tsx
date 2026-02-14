@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Calendar, CreditCard, Building2, Wallet, Banknote, Mail } from 'lucide-react';
 import { Customer, SubscriptionService, Subscription, PaymentStatus, SubscriptionPaymentMethod } from '@/types';
 import { Service } from '@/types/services';
@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 
 // Subscription types
 const subscriptionTypes = [
-  { value: 'private', label: 'خاص' },
-  { value: 'shared', label: 'مشترك' },
+  { value: 'private', label: 'Ø®Ø§Øµ' },
+  { value: 'shared', label: 'Ù…Ø´ØªØ±Ùƒ' },
 ];
 
 interface AddSubscriptionModalProps {
@@ -34,30 +34,30 @@ interface AvailableSlot {
 }
 
 const currencies = [
-  { code: 'SAR', name: 'ريال سعودي' },
-  { code: 'YER', name: 'ريال يمني' },
-  { code: 'USD', name: 'دولار أمريكي' },
-  { code: 'AED', name: 'درهم إماراتي' },
+  { code: 'SAR', name: 'Ø±ÙŠØ§Ù„ Ø³Ø¹ÙˆØ¯ÙŠ' },
+  { code: 'YER', name: 'Ø±ÙŠØ§Ù„ ÙŠÙ…Ù†ÙŠ' },
+  { code: 'USD', name: 'Ø¯ÙˆÙ„Ø§Ø± Ø£Ù…Ø±ÙŠÙƒÙŠ' },
+  { code: 'AED', name: 'Ø¯Ø±Ù‡Ù… Ø¥Ù…Ø§Ø±Ø§ØªÙŠ' },
 ];
 
 const durations = [
-  { value: 7, label: 'أسبوع' },
-  { value: 14, label: 'أسبوعين' },
-  { value: 30, label: 'شهر' },
-  { value: 60, label: 'شهرين' },
-  { value: 90, label: '3 أشهر' },
-  { value: 180, label: '6 أشهر' },
-  { value: 365, label: 'سنة' },
+  { value: 7, label: 'Ø£Ø³Ø¨ÙˆØ¹' },
+  { value: 14, label: 'Ø£Ø³Ø¨ÙˆØ¹ÙŠÙ†' },
+  { value: 30, label: 'Ø´Ù‡Ø±' },
+  { value: 60, label: 'Ø´Ù‡Ø±ÙŠÙ†' },
+  { value: 90, label: '3 Ø£Ø´Ù‡Ø±' },
+  { value: 180, label: '6 Ø£Ø´Ù‡Ø±' },
+  { value: 365, label: 'Ø³Ù†Ø©' },
 ];
 
 const deferredDays = [
-  { value: 1, label: 'يوم واحد' },
-  { value: 2, label: 'يومين' },
-  { value: 3, label: '3 أيام' },
-  { value: 5, label: '5 أيام' },
-  { value: 7, label: 'أسبوع' },
-  { value: 14, label: 'أسبوعين' },
-  { value: 30, label: 'شهر' },
+  { value: 1, label: 'ÙŠÙˆÙ… ÙˆØ§Ø­Ø¯' },
+  { value: 2, label: 'ÙŠÙˆÙ…ÙŠÙ†' },
+  { value: 3, label: '3 Ø£ÙŠØ§Ù…' },
+  { value: 5, label: '5 Ø£ÙŠØ§Ù…' },
+  { value: 7, label: 'Ø£Ø³Ø¨ÙˆØ¹' },
+  { value: 14, label: 'Ø£Ø³Ø¨ÙˆØ¹ÙŠÙ†' },
+  { value: 30, label: 'Ø´Ù‡Ø±' },
 ];
 
 const formatDateInput = (date: Date): string => {
@@ -197,7 +197,7 @@ export const AddSubscriptionModal = ({
       account_id: sharedAccounts[0]?.id ? String(sharedAccounts[0].id) : 'legacy',
       is_available: true,
       assigned_customer_id: null,
-      accountName: 'الحساب المشترك',
+      accountName: 'Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø´ØªØ±Ùƒ',
       subscriptionsCount: Array.isArray(e?.users) ? e.users.length : 0,
     })).filter((s) => s.id.length > 0);
 
@@ -308,17 +308,17 @@ export const AddSubscriptionModal = ({
     // Validate based on subscription type
     if (formData.subscriptionType === 'shared') {
       if (!selectedLegacySharedServiceId) {
-        toast.error('يرجى اختيار خدمة مشتركة');
+        toast.error('ÙŠØ±Ø¬Ù‰ Ø§Ø®ØªÙŠØ§Ø± Ø®Ø¯Ù…Ø© Ù…Ø´ØªØ±ÙƒØ©');
         return;
       }
       if (!selectedSlotId) {
-        toast.error('يرجى اختيار إيميل/سلوت متاح');
+        toast.error('ÙŠØ±Ø¬Ù‰ Ø§Ø®ØªÙŠØ§Ø± Ø¥ÙŠÙ…ÙŠÙ„/Ø³Ù„ÙˆØª Ù…ØªØ§Ø­');
         return;
       }
     } else {
       const validServices = subscriptionServices.filter(s => s.serviceName.trim());
       if (validServices.length === 0) {
-        toast.error('يرجى إضافة خدمة واحدة على الأقل');
+        toast.error('ÙŠØ±Ø¬Ù‰ Ø¥Ø¶Ø§ÙØ© Ø®Ø¯Ù…Ø© ÙˆØ§Ø­Ø¯Ø© Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„');
         return;
       }
     }
@@ -422,7 +422,7 @@ export const AddSubscriptionModal = ({
       
       <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-2xl mx-4 animate-scale-in border border-border max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-card z-10">
-          <h2 className="text-xl font-bold text-foreground">إضافة اشتراك جديد</h2>
+          <h2 className="text-xl font-bold text-foreground">Ø¥Ø¶Ø§ÙØ© Ø§Ø´ØªØ±Ø§Ùƒ Ø¬Ø¯ÙŠØ¯</h2>
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-muted transition-colors"
@@ -435,8 +435,8 @@ export const AddSubscriptionModal = ({
           {/* Customer Selection */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              العميل <span className="text-destructive">*</span> 
-              <span className="text-xs text-muted-foreground mr-2">({customers.length} عميل متاح)</span>
+              Ø§Ù„Ø¹Ù…ÙŠÙ„ <span className="text-destructive">*</span> 
+              <span className="text-xs text-muted-foreground mr-2">({customers.length} Ø¹Ù…ÙŠÙ„ Ù…ØªØ§Ø­)</span>
             </label>
             <CustomerSearchSelect
               customers={customers}
@@ -448,7 +448,7 @@ export const AddSubscriptionModal = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                مدة الاشتراك
+                Ù…Ø¯Ø© Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ
               </label>
               <select
                 value={formData.duration}
@@ -456,7 +456,7 @@ export const AddSubscriptionModal = ({
                 className="input-field"
               >
                 {!durations.some((d) => d.value === formData.duration) && (
-                  <option value={formData.duration}>{formData.duration} يوم</option>
+                  <option value={formData.duration}>{formData.duration} ÙŠÙˆÙ…</option>
                 )}
                 {durations.map(d => (
                   <option key={d.value} value={d.value}>{d.label}</option>
@@ -465,7 +465,7 @@ export const AddSubscriptionModal = ({
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                العملة
+                Ø§Ù„Ø¹Ù…Ù„Ø©
               </label>
               <select
                 value={formData.currency}
@@ -483,7 +483,7 @@ export const AddSubscriptionModal = ({
           <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                نوع الاشتراك
+                Ù†ÙˆØ¹ Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ
               </label>
               <select
                 value={formData.subscriptionType}
@@ -509,13 +509,13 @@ export const AddSubscriptionModal = ({
           {formData.subscriptionType === 'shared' && (
             <div className="space-y-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
               <div className="flex items-center gap-2 text-primary">
-                <span className="font-medium">اختيار الخدمة المشتركة</span>
+                <span className="font-medium">Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø®Ø¯Ù…Ø© Ø§Ù„Ù…Ø´ØªØ±ÙƒØ©</span>
               </div>
               
               {/* Select Shared Service */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  الخدمة <span className="text-destructive">*</span>
+                  Ø§Ù„Ø®Ø¯Ù…Ø© <span className="text-destructive">*</span>
                 </label>
                 <select
                   value={selectedLegacySharedServiceId}
@@ -530,7 +530,7 @@ export const AddSubscriptionModal = ({
                   }}
                   className="input-field"
                 >
-                  <option value="">اختر خدمة مشتركة</option>
+                  <option value="">Ø§Ø®ØªØ± Ø®Ø¯Ù…Ø© Ù…Ø´ØªØ±ÙƒØ©</option>
                   {sharedServiceSelectOptions.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -542,7 +542,7 @@ export const AddSubscriptionModal = ({
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
                     <Mail className="w-4 h-4 inline ml-1" />
-                    الإيميل / السلوت المتاح <span className="text-destructive">*</span>
+                    Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ / Ø§Ù„Ø³Ù„ÙˆØª Ø§Ù„Ù…ØªØ§Ø­ <span className="text-destructive">*</span>
                   </label>
 
                   {availableSlots.length === 0 ? (
@@ -566,7 +566,7 @@ export const AddSubscriptionModal = ({
                           <Mail className="w-4 h-4 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">
-                              {slot.email || slot.slot_name || 'سلوت متاح'}
+                              {slot.email || slot.slot_name || 'Ø³Ù„ÙˆØª Ù…ØªØ§Ø­'}
                             </p>
                             {slot.accountName && (
                               <p className="text-xs text-muted-foreground">
@@ -584,18 +584,18 @@ export const AddSubscriptionModal = ({
                   {selectedSlotEmail && (
                     <div className="mt-3 p-3 rounded-lg bg-muted/30 border border-border">
                       <div className="text-sm font-medium text-foreground mb-2">
-                        بيانات الإيميل من صفحة الخدمات (النظام القديم)
+                        Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ Ù…Ù† ØµÙØ­Ø© Ø§Ù„Ø®Ø¯Ù…Ø§Øª (Ø§Ù„Ù†Ø¸Ø§Ù… Ø§Ù„Ù‚Ø¯ÙŠÙ…)
                       </div>
                       {legacyEmailUsage.length === 0 ? (
                         <div className="text-sm text-muted-foreground">
-                          لا توجد بيانات مخزنة في النظام القديم لهذا الإيميل.
+                          Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨ÙŠØ§Ù†Ø§Øª Ù…Ø®Ø²Ù†Ø© ÙÙŠ Ø§Ù„Ù†Ø¸Ø§Ù… Ø§Ù„Ù‚Ø¯ÙŠÙ… Ù„Ù‡Ø°Ø§ Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„.
                         </div>
                       ) : (
                         <div className="space-y-2">
                           {legacyEmailUsage.map((m, idx) => (
                             <div key={idx} className="p-2 rounded-md bg-background border border-border">
                               <div className="text-sm text-foreground">
-                                <span className="font-medium">{m.serviceName || 'خدمة'}</span>
+                                <span className="font-medium">{m.serviceName || 'Ø®Ø¯Ù…Ø©'}</span>
                                 {m.accountType && (
                                   <span className="text-muted-foreground"> ({m.accountType})</span>
                                 )}
@@ -607,7 +607,7 @@ export const AddSubscriptionModal = ({
                               )}
                               {m.users.length > 0 && (
                                 <div className="text-xs text-muted-foreground mt-1">
-                                  users: {m.users.map(u => u.name).filter(Boolean).join('، ')}
+                                  users: {m.users.map(u => u.name).filter(Boolean).join('ØŒ ')}
                                 </div>
                               )}
                             </div>
@@ -626,7 +626,7 @@ export const AddSubscriptionModal = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-foreground">
-                الخدمات <span className="text-destructive">*</span>
+                Ø§Ù„Ø®Ø¯Ù…Ø§Øª <span className="text-destructive">*</span>
               </label>
               <button
                 type="button"
@@ -634,7 +634,7 @@ export const AddSubscriptionModal = ({
                 className="flex items-center gap-1 text-sm text-primary hover:underline"
               >
                 <Plus className="w-4 h-4" />
-                إضافة خدمة
+                Ø¥Ø¶Ø§ÙØ© Ø®Ø¯Ù…Ø©
               </button>
             </div>
             
@@ -650,7 +650,7 @@ export const AddSubscriptionModal = ({
                         onChange={(e) => selectExistingService(service.id, e.target.value)}
                         className="input-field flex-1"
                       >
-                        <option value="">اختر خدمة أو أدخل يدوياً</option>
+                        <option value="">Ø§Ø®ØªØ± Ø®Ø¯Ù…Ø© Ø£Ùˆ Ø£Ø¯Ø®Ù„ ÙŠØ¯ÙˆÙŠØ§Ù‹</option>
                         {privateServiceSelectOptions.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
@@ -677,7 +677,7 @@ export const AddSubscriptionModal = ({
                     <div className="flex items-center gap-1 flex-1">
                       <input
                         type="number"
-                        placeholder="السعر"
+                        placeholder="Ø§Ù„Ø³Ø¹Ø±"
                         value={service.price || ''}
                         onChange={(e) => updateService(service.id, 'price', parseFloat(e.target.value) || 0)}
                         className="input-field w-full text-center"
@@ -688,13 +688,13 @@ export const AddSubscriptionModal = ({
                     <div className="flex items-center gap-1 flex-1">
                       <input
                         type="number"
-                        placeholder="التكلفة"
+                        placeholder="Ø§Ù„ØªÙƒÙ„ÙØ©"
                         value={service.cost || ''}
                         onChange={(e) => updateService(service.id, 'cost', parseFloat(e.target.value) || 0)}
                         className="input-field w-full text-center"
                         min="0"
                       />
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">تكلفة</span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">ØªÙƒÙ„ÙØ©</span>
                     </div>
                   </div>
                 </div>
@@ -706,7 +706,7 @@ export const AddSubscriptionModal = ({
           {/* Discount */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              الخصم ({formData.currency})
+              Ø§Ù„Ø®ØµÙ… ({formData.currency})
             </label>
             <input
               type="number"
@@ -720,7 +720,7 @@ export const AddSubscriptionModal = ({
 
           {/* Payment Status Section */}
           <div className="p-4 rounded-xl bg-muted/50 border border-border space-y-4">
-            <label className="text-sm font-medium text-foreground">حالة الدفع</label>
+            <label className="text-sm font-medium text-foreground">Ø­Ø§Ù„Ø© Ø§Ù„Ø¯ÙØ¹</label>
             
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -732,7 +732,7 @@ export const AddSubscriptionModal = ({
                     : 'border-border text-muted-foreground hover:border-success/50'
                 }`}
               >
-                مدفوع كامل
+                Ù…Ø¯ÙÙˆØ¹ ÙƒØ§Ù…Ù„
               </button>
               <button
                 type="button"
@@ -743,7 +743,7 @@ export const AddSubscriptionModal = ({
                     : 'border-border text-muted-foreground hover:border-warning/50'
                 }`}
               >
-                دفع جزئي
+                Ø¯ÙØ¹ Ø¬Ø²Ø¦ÙŠ
               </button>
               <button
                 type="button"
@@ -754,7 +754,7 @@ export const AddSubscriptionModal = ({
                     : 'border-border text-muted-foreground hover:border-destructive/50'
                 }`}
               >
-                آجل
+                Ø¢Ø¬Ù„
               </button>
             </div>
 
@@ -763,7 +763,7 @@ export const AddSubscriptionModal = ({
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   <CreditCard className="w-4 h-4 inline ml-1" />
-                  طريقة الدفع
+                  Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
                   {paymentMethods.filter(m => m.active).map(method => {
@@ -798,7 +798,7 @@ export const AddSubscriptionModal = ({
             {formData.paymentStatus === 'partial' && (
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  المبلغ المدفوع ({formData.currency})
+                  Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹ ({formData.currency})
                 </label>
                 <input
                   type="number"
@@ -817,7 +817,7 @@ export const AddSubscriptionModal = ({
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   <Calendar className="w-4 h-4 inline ml-1" />
-                  موعد السداد
+                  Ù…ÙˆØ¹Ø¯ Ø§Ù„Ø³Ø¯Ø§Ø¯
                 </label>
                 <select
                   value={formData.deferredDays}
@@ -826,7 +826,7 @@ export const AddSubscriptionModal = ({
                 >
                   {deferredDays.map(d => (
                     <option key={d.value} value={d.value}>
-                      بعد {d.label}
+                      Ø¨Ø¹Ø¯ {d.label}
                     </option>
                   ))}
                 </select>
@@ -837,13 +837,13 @@ export const AddSubscriptionModal = ({
             {formData.paymentStatus !== 'paid' && (
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  ملاحظات الدفع
+                  Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„Ø¯ÙØ¹
                 </label>
                 <input
                   type="text"
                   value={formData.paymentNotes}
                   onChange={(e) => setFormData({ ...formData, paymentNotes: e.target.value })}
-                  placeholder="مثال: سيتم السداد عند استلام الراتب"
+                  placeholder="Ù…Ø«Ø§Ù„: Ø³ÙŠØªÙ… Ø§Ù„Ø³Ø¯Ø§Ø¯ Ø¹Ù†Ø¯ Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø±Ø§ØªØ¨"
                   className="input-field"
                 />
               </div>
@@ -853,16 +853,16 @@ export const AddSubscriptionModal = ({
             {formData.paymentStatus !== 'paid' && (
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">المبلغ المتبقي:</span>
+                  <span className="text-muted-foreground">Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ:</span>
                   <span className="font-bold text-destructive">
                     {remainingAmount} {formData.currency}
                   </span>
                 </div>
                 {dueDate && (
                   <div className="flex justify-between text-sm mt-1">
-                    <span className="text-muted-foreground">تاريخ السداد:</span>
+                    <span className="text-muted-foreground">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø³Ø¯Ø§Ø¯:</span>
                     <span className="font-medium text-foreground">
-                      {dueDate.toLocaleDateString('ar-SA')}
+                      {dueDate.toLocaleDateString('ar-SA-u-ca-gregory')}
                     </span>
                   </div>
                 )}
@@ -871,25 +871,25 @@ export const AddSubscriptionModal = ({
           </div>
           <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">إجمالي السعر:</span>
+              <span className="text-muted-foreground">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø³Ø¹Ø±:</span>
               <span className="font-medium text-foreground">{totalPrice} {formData.currency}</span>
             </div>
             {formData.discount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">الخصم:</span>
+                <span className="text-muted-foreground">Ø§Ù„Ø®ØµÙ…:</span>
                 <span className="font-medium text-destructive">-{formData.discount} {formData.currency}</span>
               </div>
             )}
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">السعر بعد الخصم:</span>
+              <span className="text-muted-foreground">Ø§Ù„Ø³Ø¹Ø± Ø¨Ø¹Ø¯ Ø§Ù„Ø®ØµÙ…:</span>
               <span className="font-semibold text-foreground">{finalPrice} {formData.currency}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">إجمالي التكلفة:</span>
+              <span className="text-muted-foreground">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ØªÙƒÙ„ÙØ©:</span>
               <span className="font-medium text-foreground">{totalCost} {formData.currency}</span>
             </div>
             <div className="flex justify-between text-sm pt-2 border-t border-border">
-              <span className="text-muted-foreground">الربح المتوقع:</span>
+              <span className="text-muted-foreground">Ø§Ù„Ø±Ø¨Ø­ Ø§Ù„Ù…ØªÙˆÙ‚Ø¹:</span>
               <span className={`font-bold ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {profit} {formData.currency}
               </span>
@@ -899,12 +899,12 @@ export const AddSubscriptionModal = ({
           {/* Date Preview */}
           <div className="hidden">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">تاريخ البداية:</span>
-              <span className="font-medium text-foreground">{startDate.toLocaleDateString('ar-SA')}</span>
+              <span className="text-muted-foreground">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨Ø¯Ø§ÙŠØ©:</span>
+              <span className="font-medium text-foreground">{startDate.toLocaleDateString('ar-SA-u-ca-gregory')}</span>
             </div>
             <div className="flex justify-between text-sm mt-2">
-              <span className="text-muted-foreground">تاريخ الانتهاء:</span>
-              <span className="font-medium text-foreground">{endDate.toLocaleDateString('ar-SA')}</span>
+              <span className="text-muted-foreground">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡:</span>
+              <span className="font-medium text-foreground">{endDate.toLocaleDateString('ar-SA-u-ca-gregory')}</span>
             </div>
           </div>
 
@@ -912,7 +912,7 @@ export const AddSubscriptionModal = ({
           <div className="p-3 rounded-lg bg-muted/50 border border-border">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm text-muted-foreground mb-1">تاريخ البداية:</label>
+                <label className="block text-sm text-muted-foreground mb-1">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨Ø¯Ø§ÙŠØ©:</label>
                 <input
                   type="date"
                   value={startDateInput}
@@ -921,7 +921,7 @@ export const AddSubscriptionModal = ({
                 />
               </div>
               <div>
-                <label className="block text-sm text-muted-foreground mb-1">تاريخ الانتهاء:</label>
+                <label className="block text-sm text-muted-foreground mb-1">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡:</label>
                 <input
                   type="date"
                   value={endDateInput}
@@ -937,7 +937,7 @@ export const AddSubscriptionModal = ({
               </div>
             </div>
             <div className="mt-2 text-xs text-muted-foreground">
-              تغيير تاريخ الانتهاء يحدّث مدة الاشتراك تلقائيا.
+              ØªØºÙŠÙŠØ± ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡ ÙŠØ­Ø¯Ù‘Ø« Ù…Ø¯Ø© Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§.
             </div>
           </div>
 
@@ -948,7 +948,7 @@ export const AddSubscriptionModal = ({
               onChange={(e) => setFormData({ ...formData, autoRenew: e.target.checked })}
               className="w-4 h-4 rounded border-input accent-primary"
             />
-            <span className="text-foreground">تفعيل التجديد التلقائي</span>
+            <span className="text-foreground">ØªÙØ¹ÙŠÙ„ Ø§Ù„ØªØ¬Ø¯ÙŠØ¯ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ</span>
           </label>
 
           {/* Actions */}
@@ -958,10 +958,10 @@ export const AddSubscriptionModal = ({
               className="btn-primary flex-1"
               disabled={!selectedCustomer || subscriptionServices.every(s => !s.serviceName.trim())}
             >
-              إضافة الاشتراك
+              Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ
             </button>
             <button type="button" onClick={onClose} className="btn-secondary">
-              إلغاء
+              Ø¥Ù„ØºØ§Ø¡
             </button>
           </div>
         </form>
@@ -969,3 +969,4 @@ export const AddSubscriptionModal = ({
     </div>
   );
 };
+

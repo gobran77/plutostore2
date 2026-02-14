@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Header } from '@/components/layout/Header';
 import { DataTable } from '@/components/common/DataTable';
@@ -152,7 +152,7 @@ const Services = () => {
       createdAt: new Date(),
     };
     setServices([newService, ...services]);
-    toast.success('تمت إضافة الخدمة بنجاح');
+    toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø®Ø¯Ù…Ø© Ø¨Ù†Ø¬Ø§Ø­');
   };
 
   // Dynamic Service CRUD
@@ -165,7 +165,7 @@ const Services = () => {
           : s
       );
       setDynamicServices(updated);
-      toast.success('تم تحديث الخدمة بنجاح');
+      toast.success('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø®Ø¯Ù…Ø© Ø¨Ù†Ø¬Ø§Ø­');
       setEditingDynamicService(undefined);
     } else {
       // Create new
@@ -176,7 +176,7 @@ const Services = () => {
         updatedAt: new Date(),
       };
       setDynamicServices([newService, ...dynamicServices]);
-      toast.success('تمت إضافة الخدمة بنجاح');
+      toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø®Ø¯Ù…Ø© Ø¨Ù†Ø¬Ø§Ø­');
     }
   };
 
@@ -186,7 +186,7 @@ const Services = () => {
     );
     setDynamicServices(updated);
     const service = updated.find(s => s.id === id);
-    toast.success(service?.isActive ? 'تم تفعيل الخدمة' : 'تم إيقاف الخدمة');
+    toast.success(service?.isActive ? 'ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø®Ø¯Ù…Ø©' : 'ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„Ø®Ø¯Ù…Ø©');
   };
 
   // Account CRUD
@@ -211,7 +211,7 @@ const Services = () => {
     setSelectedService({ ...selectedService, accounts: [newAccount, ...selectedService.accounts] });
     setAccountForm({ type: selectedService.defaultType, subscriberEmail: '' });
     setIsAddAccountModalOpen(false);
-    toast.success('تمت إضافة الحساب بنجاح');
+    toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø­Ø³Ø§Ø¨ Ø¨Ù†Ø¬Ø§Ø­');
   };
 
   // Email CRUD
@@ -251,7 +251,7 @@ const Services = () => {
     
     setEmailForm({ email: '', password: '' });
     setIsAddEmailModalOpen(false);
-    toast.success('تمت إضافة الإيميل بنجاح');
+    toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ Ø¨Ù†Ø¬Ø§Ø­');
   };
 
   const syncLoginCredentialsToSubscriptions = (
@@ -299,7 +299,7 @@ const Services = () => {
   const handleUpdateEmailCredentials = async () => {
     if (!selectedService || !selectedAccount || !selectedEmail) return;
     if (!editEmailForm.email.trim()) {
-      toast.error('يرجى إدخال الإيميل');
+      toast.error('ÙŠØ±Ø¬Ù‰ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„');
       return;
     }
     const updated: ServiceEmail = {
@@ -342,7 +342,7 @@ const Services = () => {
     );
 
     setIsEditEmailModalOpen(false);
-    toast.success('تم تحديث بيانات الدخول');
+    toast.success('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„');
   };
 
   // User CRUD
@@ -388,7 +388,7 @@ const Services = () => {
       }
     }
     
-    toast.success('تمت إضافة المستخدم بنجاح');
+    toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø¨Ù†Ø¬Ø§Ø­');
   };
 
   const handleRemoveUser = (userId: string) => {
@@ -426,7 +426,7 @@ const Services = () => {
         if (updatedEmail) setSelectedEmail(updatedEmail);
       }
     }
-    toast.success('تم إزالة المستخدم بنجاح');
+    toast.success('ØªÙ… Ø¥Ø²Ø§Ù„Ø© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø¨Ù†Ø¬Ø§Ø­');
   };
 
   // Delete handlers
@@ -435,7 +435,7 @@ const Services = () => {
     
     if (deleteTarget.type === 'dynamic') {
       setDynamicServices(dynamicServices.filter(s => s.id !== deleteTarget.id));
-      toast.success('تم حذف الخدمة بنجاح');
+      toast.success('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø®Ø¯Ù…Ø© Ø¨Ù†Ø¬Ø§Ø­');
     } else if (deleteTarget.type === 'service') {
       const updatedServices = services.filter(s => s.id !== deleteTarget.id);
       setServices(updatedServices);
@@ -498,7 +498,7 @@ const Services = () => {
   const dynamicServiceColumns = [
     {
       key: 'name',
-      header: 'الخدمة',
+      header: 'Ø§Ù„Ø®Ø¯Ù…Ø©',
       render: (service: DynamicService) => (
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
@@ -510,7 +510,7 @@ const Services = () => {
             <div className="flex items-center gap-2">
               <p className="font-medium text-foreground">{service.name}</p>
               {!service.isActive && (
-                <Badge variant="secondary" className="text-xs">متوقفة</Badge>
+                <Badge variant="secondary" className="text-xs">Ù…ØªÙˆÙ‚ÙØ©</Badge>
               )}
             </div>
             {service.description && (
@@ -522,7 +522,7 @@ const Services = () => {
     },
     {
       key: 'pricing',
-      header: 'التسعير',
+      header: 'Ø§Ù„ØªØ³Ø¹ÙŠØ±',
       render: (service: DynamicService) => (
         <div className="text-sm">
           {service.pricingType === 'fixed' && service.fixedPrice ? (
@@ -530,37 +530,37 @@ const Services = () => {
               {service.fixedPrice} {getCurrencySymbol(service.currency)}
             </span>
           ) : service.pricingType === 'dynamic' ? (
-            <span className="text-muted-foreground">حسب الإدخال</span>
+            <span className="text-muted-foreground">Ø­Ø³Ø¨ Ø§Ù„Ø¥Ø¯Ø®Ø§Ù„</span>
           ) : (
-            <span className="text-muted-foreground">عرض سعر</span>
+            <span className="text-muted-foreground">Ø¹Ø±Ø¶ Ø³Ø¹Ø±</span>
           )}
         </div>
       ),
     },
     {
       key: 'fields',
-      header: 'الحقول',
+      header: 'Ø§Ù„Ø­Ù‚ÙˆÙ„',
       render: (service: DynamicService) => (
         <span className="text-muted-foreground text-sm">
-          {service.customerFields.length} حقل
+          {service.customerFields.length} Ø­Ù‚Ù„
         </span>
       ),
     },
     {
       key: 'workflow',
-      header: 'المراحل',
+      header: 'Ø§Ù„Ù…Ø±Ø§Ø­Ù„',
       render: (service: DynamicService) => (
         <span className="text-muted-foreground text-sm">
-          {service.workflowSteps.filter(s => s.enabled).length} مرحلة
+          {service.workflowSteps.filter(s => s.enabled).length} Ù…Ø±Ø­Ù„Ø©
         </span>
       ),
     },
     {
       key: 'payment',
-      header: 'الدفع',
+      header: 'Ø§Ù„Ø¯ÙØ¹',
       render: (service: DynamicService) => (
         <Badge variant={service.paymentConfig.required ? 'default' : 'secondary'}>
-          {service.paymentConfig.required ? 'مطلوب' : 'غير مطلوب'}
+          {service.paymentConfig.required ? 'Ù…Ø·Ù„ÙˆØ¨' : 'ØºÙŠØ± Ù…Ø·Ù„ÙˆØ¨'}
         </Badge>
       ),
     },
@@ -576,14 +576,14 @@ const Services = () => {
                 ? 'hover:bg-muted text-success' 
                 : 'hover:bg-muted text-muted-foreground'
             }`}
-            title={service.isActive ? 'إيقاف الخدمة' : 'تفعيل الخدمة'}
+            title={service.isActive ? 'Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„Ø®Ø¯Ù…Ø©' : 'ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø®Ø¯Ù…Ø©'}
           >
             {service.isActive ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
           </button>
           <ActionsMenu
             items={[
               {
-                label: 'تعديل',
+                label: 'ØªØ¹Ø¯ÙŠÙ„',
                 icon: Edit,
                 onClick: () => {
                   setEditingDynamicService(service);
@@ -591,7 +591,7 @@ const Services = () => {
                 },
               },
               {
-                label: 'حذف',
+                label: 'Ø­Ø°Ù',
                 icon: Trash2,
                 onClick: () => {
                   setDeleteTarget({ type: 'dynamic', id: service.id, name: service.name });
@@ -611,7 +611,7 @@ const Services = () => {
   const serviceColumns = [
     {
       key: 'name',
-      header: 'الخدمة',
+      header: 'Ø§Ù„Ø®Ø¯Ù…Ø©',
       render: (service: Service) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -628,7 +628,7 @@ const Services = () => {
     },
     {
       key: 'defaultType',
-      header: 'النوع الافتراضي',
+      header: 'Ø§Ù„Ù†ÙˆØ¹ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ',
       render: (service: Service) => (
         <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${
           service.defaultType === 'shared' 
@@ -638,12 +638,12 @@ const Services = () => {
           {service.defaultType === 'shared' ? (
             <>
               <Users className="w-4 h-4" />
-              <span className="text-sm font-medium">مشترك</span>
+              <span className="text-sm font-medium">Ù…Ø´ØªØ±Ùƒ</span>
             </>
           ) : (
             <>
               <User className="w-4 h-4" />
-              <span className="text-sm font-medium">خاص</span>
+              <span className="text-sm font-medium">Ø®Ø§Øµ</span>
             </>
           )}
         </div>
@@ -651,26 +651,26 @@ const Services = () => {
     },
     {
       key: 'accounts',
-      header: 'الحسابات',
+      header: 'Ø§Ù„Ø­Ø³Ø§Ø¨Ø§Øª',
       render: (service: Service) => (
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1 text-sm">
             <Users className="w-4 h-4 text-primary" />
-            <span>{service.accounts.filter(a => a.type === 'shared').length} مشترك</span>
+            <span>{service.accounts.filter(a => a.type === 'shared').length} Ù…Ø´ØªØ±Ùƒ</span>
           </div>
           <div className="flex items-center gap-1 text-sm">
             <User className="w-4 h-4 text-success" />
-            <span>{service.accounts.filter(a => a.type === 'private').length} خاص</span>
+            <span>{service.accounts.filter(a => a.type === 'private').length} Ø®Ø§Øµ</span>
           </div>
         </div>
       ),
     },
     {
       key: 'createdAt',
-      header: 'تاريخ الإضافة',
+      header: 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ø¶Ø§ÙØ©',
       render: (service: Service) => (
         <span className="text-muted-foreground text-sm">
-          {service.createdAt.toLocaleDateString('ar-SA')}
+          {service.createdAt.toLocaleDateString('ar-SA-u-ca-gregory')}
         </span>
       ),
     },
@@ -682,19 +682,19 @@ const Services = () => {
           <button
             onClick={() => openServiceAccounts(service)}
             className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors"
-            title="عرض الحسابات"
+            title="Ø¹Ø±Ø¶ Ø§Ù„Ø­Ø³Ø§Ø¨Ø§Øª"
           >
             <ArrowRight className="w-4 h-4" />
           </button>
           <ActionsMenu
             items={[
               {
-                label: 'عرض الحسابات',
+                label: 'Ø¹Ø±Ø¶ Ø§Ù„Ø­Ø³Ø§Ø¨Ø§Øª',
                 icon: Eye,
                 onClick: () => openServiceAccounts(service),
               },
               {
-                label: 'حذف',
+                label: 'Ø­Ø°Ù',
                 icon: Trash2,
                 onClick: () => {
                   setDeleteTarget({ type: 'service', id: service.id, name: service.name });
@@ -713,7 +713,7 @@ const Services = () => {
   const accountColumns = [
     {
       key: 'type',
-      header: 'نوع الحساب',
+      header: 'Ù†ÙˆØ¹ Ø§Ù„Ø­Ø³Ø§Ø¨',
       render: (account: ServiceAccount) => (
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
@@ -727,7 +727,7 @@ const Services = () => {
           </div>
           <div>
             <p className="font-medium text-foreground">
-              {account.type === 'shared' ? 'حساب مشترك' : 'حساب خاص'}
+              {account.type === 'shared' ? 'Ø­Ø³Ø§Ø¨ Ù…Ø´ØªØ±Ùƒ' : 'Ø­Ø³Ø§Ø¨ Ø®Ø§Øµ'}
             </p>
             {account.type === 'private' && account.subscriberEmail && (
               <p className="text-xs text-muted-foreground" dir="ltr">{account.subscriberEmail}</p>
@@ -738,19 +738,19 @@ const Services = () => {
     },
     {
       key: 'emails',
-      header: 'الإيميلات',
+      header: 'Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„Ø§Øª',
       render: (account: ServiceAccount) => (
         <span className="text-muted-foreground">
-          {account.type === 'shared' ? `${account.sharedEmails.length} إيميل` : '-'}
+          {account.type === 'shared' ? `${account.sharedEmails.length} Ø¥ÙŠÙ…ÙŠÙ„` : '-'}
         </span>
       ),
     },
     {
       key: 'createdAt',
-      header: 'تاريخ الإضافة',
+      header: 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ø¶Ø§ÙØ©',
       render: (account: ServiceAccount) => (
         <span className="text-muted-foreground text-sm">
-          {account.createdAt.toLocaleDateString('ar-SA')}
+          {account.createdAt.toLocaleDateString('ar-SA-u-ca-gregory')}
         </span>
       ),
     },
@@ -763,7 +763,7 @@ const Services = () => {
             <button
               onClick={() => openAccountEmails(account)}
               className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors"
-              title="عرض الإيميلات"
+              title="Ø¹Ø±Ø¶ Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„Ø§Øª"
             >
               <ArrowRight className="w-4 h-4" />
             </button>
@@ -771,18 +771,18 @@ const Services = () => {
           <ActionsMenu
             items={[
               ...(account.type === 'shared' ? [{
-                label: 'إدارة الإيميلات',
+                label: 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„Ø§Øª',
                 icon: Mail,
                 onClick: () => openAccountEmails(account),
               }] : []),
               {
-                label: 'حذف',
+                label: 'Ø­Ø°Ù',
                 icon: Trash2,
                 onClick: () => {
                   setDeleteTarget({ 
                     type: 'account', 
                     id: account.id, 
-                    name: account.type === 'shared' ? 'الحساب المشترك' : account.subscriberEmail || 'الحساب الخاص'
+                    name: account.type === 'shared' ? 'Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø´ØªØ±Ùƒ' : account.subscriberEmail || 'Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ø®Ø§Øµ'
                   });
                   setIsDeleteModalOpen(true);
                 },
@@ -799,7 +799,7 @@ const Services = () => {
   const emailColumns = [
     {
       key: 'email',
-      header: 'الإيميل',
+      header: 'Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„',
       render: (email: ServiceEmail) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
@@ -811,16 +811,16 @@ const Services = () => {
     },
     {
       key: 'password',
-      header: 'كلمة المرور',
+      header: 'ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±',
       render: (email: ServiceEmail) => (
         <span className="text-muted-foreground font-mono text-sm" dir="ltr">
-          {email.password ? '••••••••' : '-'}
+          {email.password ? 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢' : '-'}
         </span>
       ),
     },
     {
       key: 'users',
-      header: 'المستخدمون',
+      header: 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†',
       render: (email: ServiceEmail) => (
         <button
           onClick={() => {
@@ -830,16 +830,16 @@ const Services = () => {
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
         >
           <Users className="w-4 h-4 text-primary" />
-          <span className="text-primary font-medium">{email.users.length} مستخدم</span>
+          <span className="text-primary font-medium">{email.users.length} Ù…Ø³ØªØ®Ø¯Ù…</span>
         </button>
       ),
     },
     {
       key: 'addedAt',
-      header: 'تاريخ الإضافة',
+      header: 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ø¶Ø§ÙØ©',
       render: (email: ServiceEmail) => (
         <span className="text-muted-foreground text-sm">
-          {email.addedAt.toLocaleDateString('ar-SA')}
+          {email.addedAt.toLocaleDateString('ar-SA-u-ca-gregory')}
         </span>
       ),
     },
@@ -850,7 +850,7 @@ const Services = () => {
         <ActionsMenu
           items={[
             {
-              label: 'إدارة المستخدمين',
+              label: 'Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†',
               icon: Users,
               onClick: () => {
                 setSelectedEmail(email);
@@ -858,7 +858,7 @@ const Services = () => {
               },
             },
             {
-              label: 'تحديث الإيميل والباسورد',
+              label: 'ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ ÙˆØ§Ù„Ø¨Ø§Ø³ÙˆØ±Ø¯',
               icon: KeyRound,
               onClick: () => {
                 setSelectedEmail(email);
@@ -867,7 +867,7 @@ const Services = () => {
               },
             },
             {
-              label: 'حذف',
+              label: 'Ø­Ø°Ù',
               icon: Trash2,
               onClick: () => {
                 setDeleteTarget({ type: 'email', id: email.id, name: email.email });
@@ -889,7 +889,7 @@ const Services = () => {
     return (
       <div className="flex items-center gap-2 text-sm mb-4">
         <button onClick={() => { setViewMode('services'); setSelectedService(null); setSelectedAccount(null); }} className="text-primary hover:underline">
-          الخدمات
+          Ø§Ù„Ø®Ø¯Ù…Ø§Øª
         </button>
         {viewMode === 'accounts' && selectedService && (
           <>
@@ -904,7 +904,7 @@ const Services = () => {
               {selectedService.name}
             </button>
             <ChevronRight className="w-4 h-4 text-muted-foreground rotate-180" />
-            <span className="text-foreground">حساب مشترك</span>
+            <span className="text-foreground">Ø­Ø³Ø§Ø¨ Ù…Ø´ØªØ±Ùƒ</span>
           </>
         )}
       </div>
@@ -915,22 +915,22 @@ const Services = () => {
     <MainLayout>
       <Header
         title={
-          viewMode === 'services' ? 'الخدمات' :
-          viewMode === 'accounts' ? `حسابات ${selectedService?.name}` :
-          'إيميلات الحساب المشترك'
+          viewMode === 'services' ? 'Ø§Ù„Ø®Ø¯Ù…Ø§Øª' :
+          viewMode === 'accounts' ? `Ø­Ø³Ø§Ø¨Ø§Øª ${selectedService?.name}` :
+          'Ø¥ÙŠÙ…ÙŠÙ„Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø´ØªØ±Ùƒ'
         }
         subtitle={
           viewMode === 'services' 
-            ? `${dynamicServices.length + services.length} خدمة` 
+            ? `${dynamicServices.length + services.length} Ø®Ø¯Ù…Ø©` 
             : viewMode === 'accounts' 
-            ? `${selectedService?.accounts.length || 0} حساب` 
-            : `${selectedAccount?.sharedEmails.length || 0} إيميل`
+            ? `${selectedService?.accounts.length || 0} Ø­Ø³Ø§Ø¨` 
+            : `${selectedAccount?.sharedEmails.length || 0} Ø¥ÙŠÙ…ÙŠÙ„`
         }
         showAddButton={viewMode !== 'services' || activeTab === 'legacy'}
         addButtonLabel={
-          viewMode === 'services' ? 'إضافة خدمة' :
-          viewMode === 'accounts' ? 'إضافة حساب' :
-          'إضافة إيميل'
+          viewMode === 'services' ? 'Ø¥Ø¶Ø§ÙØ© Ø®Ø¯Ù…Ø©' :
+          viewMode === 'accounts' ? 'Ø¥Ø¶Ø§ÙØ© Ø­Ø³Ø§Ø¨' :
+          'Ø¥Ø¶Ø§ÙØ© Ø¥ÙŠÙ…ÙŠÙ„'
         }
         onAddClick={() => {
           if (viewMode === 'services') {
@@ -947,7 +947,7 @@ const Services = () => {
         {viewMode === 'services' && activeTab === 'dynamic' && (
           <Button onClick={() => setIsAddDynamicServiceModalOpen(true)}>
             <Plus className="w-4 h-4 ml-2" />
-            إضافة خدمة ديناميكية
+            Ø¥Ø¶Ø§ÙØ© Ø®Ø¯Ù…Ø© Ø¯ÙŠÙ†Ø§Ù…ÙŠÙƒÙŠØ©
           </Button>
         )}
       </Header>
@@ -958,11 +958,11 @@ const Services = () => {
             <TabsList className="mb-4">
               <TabsTrigger value="dynamic" className="gap-2">
                 <Zap className="w-4 h-4" />
-                الخدمات الديناميكية
+                Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ø¯ÙŠÙ†Ø§Ù…ÙŠÙƒÙŠØ©
               </TabsTrigger>
               <TabsTrigger value="legacy" className="gap-2">
                 <Package className="w-4 h-4" />
-                الاشتراكات (النظام القديم)
+                Ø§Ù„Ø§Ø´ØªØ±Ø§ÙƒØ§Øª (Ø§Ù„Ù†Ø¸Ø§Ù… Ø§Ù„Ù‚Ø¯ÙŠÙ…)
               </TabsTrigger>
             </TabsList>
 
@@ -970,13 +970,13 @@ const Services = () => {
               {dynamicServices.length === 0 ? (
                 <div className="text-center py-16 bg-card rounded-xl border border-border">
                   <Zap className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">لا توجد خدمات ديناميكية</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø®Ø¯Ù…Ø§Øª Ø¯ÙŠÙ†Ø§Ù…ÙŠÙƒÙŠØ©</h3>
                   <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                    أنشئ خدمات مخصصة بحقول ومراحل وإجراءات مرنة حسب احتياجاتك
+                    Ø£Ù†Ø´Ø¦ Ø®Ø¯Ù…Ø§Øª Ù…Ø®ØµØµØ© Ø¨Ø­Ù‚ÙˆÙ„ ÙˆÙ…Ø±Ø§Ø­Ù„ ÙˆØ¥Ø¬Ø±Ø§Ø¡Ø§Øª Ù…Ø±Ù†Ø© Ø­Ø³Ø¨ Ø§Ø­ØªÙŠØ§Ø¬Ø§ØªÙƒ
                   </p>
                   <Button onClick={() => setIsAddDynamicServiceModalOpen(true)}>
                     <Plus className="w-4 h-4 ml-2" />
-                    إضافة خدمة ديناميكية
+                    Ø¥Ø¶Ø§ÙØ© Ø®Ø¯Ù…Ø© Ø¯ÙŠÙ†Ø§Ù…ÙŠÙƒÙŠØ©
                   </Button>
                 </div>
               ) : (
@@ -992,11 +992,11 @@ const Services = () => {
               {services.length === 0 ? (
                 <div className="text-center py-16 bg-card rounded-xl border border-border">
                   <Package className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">لا توجد خدمات</h3>
-                  <p className="text-muted-foreground mb-4">ابدأ بإضافة الخدمات التي تقدمها</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø®Ø¯Ù…Ø§Øª</h3>
+                  <p className="text-muted-foreground mb-4">Ø§Ø¨Ø¯Ø£ Ø¨Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„ØªÙŠ ØªÙ‚Ø¯Ù…Ù‡Ø§</p>
                   <button onClick={() => setIsAddServiceModalOpen(true)} className="btn-primary">
                     <Plus className="w-4 h-4" />
-                    إضافة خدمة
+                    Ø¥Ø¶Ø§ÙØ© Ø®Ø¯Ù…Ø©
                   </button>
                 </div>
               ) : (
@@ -1016,11 +1016,11 @@ const Services = () => {
           selectedService.accounts.length === 0 ? (
             <div className="text-center py-16 bg-card rounded-xl border border-border">
               <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">لا توجد حسابات</h3>
-              <p className="text-muted-foreground mb-4">أضف حسابات مشتركة أو خاصة لهذه الخدمة</p>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø­Ø³Ø§Ø¨Ø§Øª</h3>
+              <p className="text-muted-foreground mb-4">Ø£Ø¶Ù Ø­Ø³Ø§Ø¨Ø§Øª Ù…Ø´ØªØ±ÙƒØ© Ø£Ùˆ Ø®Ø§ØµØ© Ù„Ù‡Ø°Ù‡ Ø§Ù„Ø®Ø¯Ù…Ø©</p>
               <button onClick={() => setIsAddAccountModalOpen(true)} className="btn-primary">
                 <Plus className="w-4 h-4" />
-                إضافة حساب
+                Ø¥Ø¶Ø§ÙØ© Ø­Ø³Ø§Ø¨
               </button>
             </div>
           ) : (
@@ -1036,11 +1036,11 @@ const Services = () => {
           selectedAccount.sharedEmails.length === 0 ? (
             <div className="text-center py-16 bg-card rounded-xl border border-border">
               <Mail className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">لا توجد إيميلات</h3>
-              <p className="text-muted-foreground mb-4">أضف إيميلات المستخدمين الذين يشاركون هذا الحساب</p>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¥ÙŠÙ…ÙŠÙ„Ø§Øª</h3>
+              <p className="text-muted-foreground mb-4">Ø£Ø¶Ù Ø¥ÙŠÙ…ÙŠÙ„Ø§Øª Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† Ø§Ù„Ø°ÙŠÙ† ÙŠØ´Ø§Ø±ÙƒÙˆÙ† Ù‡Ø°Ø§ Ø§Ù„Ø­Ø³Ø§Ø¨</p>
               <button onClick={() => setIsAddEmailModalOpen(true)} className="btn-primary">
                 <Plus className="w-4 h-4" />
-                إضافة إيميل
+                Ø¥Ø¶Ø§ÙØ© Ø¥ÙŠÙ…ÙŠÙ„
               </button>
             </div>
           ) : (
@@ -1078,14 +1078,14 @@ const Services = () => {
           <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={() => setIsAddAccountModalOpen(false)} />
           <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in border border-border">
             <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-xl font-bold text-foreground">إضافة حساب جديد</h2>
+              <h2 className="text-xl font-bold text-foreground">Ø¥Ø¶Ø§ÙØ© Ø­Ø³Ø§Ø¨ Ø¬Ø¯ÙŠØ¯</h2>
               <button onClick={() => setIsAddAccountModalOpen(false)} className="p-2 rounded-lg hover:bg-muted transition-colors">
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">نوع الحساب</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Ù†ÙˆØ¹ Ø§Ù„Ø­Ø³Ø§Ø¨</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -1097,8 +1097,8 @@ const Services = () => {
                     }`}
                   >
                     <Users className={`w-6 h-6 mx-auto mb-2 ${accountForm.type === 'shared' ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <p className="font-medium text-foreground">مشترك</p>
-                    <p className="text-xs text-muted-foreground">حساب واحد لعدة مستخدمين</p>
+                    <p className="font-medium text-foreground">Ù…Ø´ØªØ±Ùƒ</p>
+                    <p className="text-xs text-muted-foreground">Ø­Ø³Ø§Ø¨ ÙˆØ§Ø­Ø¯ Ù„Ø¹Ø¯Ø© Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†</p>
                   </button>
                   <button
                     type="button"
@@ -1110,15 +1110,15 @@ const Services = () => {
                     }`}
                   >
                     <User className={`w-6 h-6 mx-auto mb-2 ${accountForm.type === 'private' ? 'text-success' : 'text-muted-foreground'}`} />
-                    <p className="font-medium text-foreground">خاص</p>
-                    <p className="text-xs text-muted-foreground">حساب خاص بالمشترك</p>
+                    <p className="font-medium text-foreground">Ø®Ø§Øµ</p>
+                    <p className="text-xs text-muted-foreground">Ø­Ø³Ø§Ø¨ Ø®Ø§Øµ Ø¨Ø§Ù„Ù…Ø´ØªØ±Ùƒ</p>
                   </button>
                 </div>
               </div>
               {accountForm.type === 'private' && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    إيميل المشترك <span className="text-destructive">*</span>
+                    Ø¥ÙŠÙ…ÙŠÙ„ Ø§Ù„Ù…Ø´ØªØ±Ùƒ <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="email"
@@ -1131,8 +1131,8 @@ const Services = () => {
                 </div>
               )}
               <div className="flex items-center gap-3 pt-4">
-                <button onClick={handleAddAccount} className="btn-primary flex-1">إضافة الحساب</button>
-                <button onClick={() => setIsAddAccountModalOpen(false)} className="btn-secondary">إلغاء</button>
+                <button onClick={handleAddAccount} className="btn-primary flex-1">Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø­Ø³Ø§Ø¨</button>
+                <button onClick={() => setIsAddAccountModalOpen(false)} className="btn-secondary">Ø¥Ù„ØºØ§Ø¡</button>
               </div>
             </div>
           </div>
@@ -1145,7 +1145,7 @@ const Services = () => {
           <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={() => setIsAddEmailModalOpen(false)} />
           <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in border border-border">
             <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-xl font-bold text-foreground">إضافة إيميل مستخدم</h2>
+              <h2 className="text-xl font-bold text-foreground">Ø¥Ø¶Ø§ÙØ© Ø¥ÙŠÙ…ÙŠÙ„ Ù…Ø³ØªØ®Ø¯Ù…</h2>
               <button onClick={() => setIsAddEmailModalOpen(false)} className="p-2 rounded-lg hover:bg-muted transition-colors">
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
@@ -1153,7 +1153,7 @@ const Services = () => {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  الإيميل <span className="text-destructive">*</span>
+                  Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="email"
@@ -1165,19 +1165,19 @@ const Services = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">كلمة المرور (اختياري)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)</label>
                 <input
                   type="text"
                   value={emailForm.password}
                   onChange={(e) => setEmailForm({ ...emailForm, password: e.target.value })}
-                  placeholder="كلمة المرور للحساب"
+                  placeholder="ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ù„Ù„Ø­Ø³Ø§Ø¨"
                   className="input-field"
                   dir="ltr"
                 />
               </div>
               <div className="flex items-center gap-3 pt-4">
-                <button onClick={handleAddEmail} className="btn-primary flex-1">إضافة الإيميل</button>
-                <button onClick={() => setIsAddEmailModalOpen(false)} className="btn-secondary">إلغاء</button>
+                <button onClick={handleAddEmail} className="btn-primary flex-1">Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„</button>
+                <button onClick={() => setIsAddEmailModalOpen(false)} className="btn-secondary">Ø¥Ù„ØºØ§Ø¡</button>
               </div>
             </div>
           </div>
@@ -1195,7 +1195,7 @@ const Services = () => {
           />
           <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in border border-border">
             <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-xl font-bold text-foreground">تحديث بيانات الدخول</h2>
+              <h2 className="text-xl font-bold text-foreground">ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„</h2>
               <button
                 onClick={() => setIsEditEmailModalOpen(false)}
                 className="p-2 rounded-lg hover:bg-muted transition-colors"
@@ -1206,7 +1206,7 @@ const Services = () => {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  الإيميل <span className="text-destructive">*</span>
+                  Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„ <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="email"
@@ -1218,22 +1218,22 @@ const Services = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">كلمة المرور</label>
+                <label className="block text-sm font-medium text-foreground mb-2">ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±</label>
                 <input
                   type="text"
                   value={editEmailForm.password}
                   onChange={(e) => setEditEmailForm({ ...editEmailForm, password: e.target.value })}
-                  placeholder="كلمة المرور للحساب"
+                  placeholder="ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ù„Ù„Ø­Ø³Ø§Ø¨"
                   className="input-field"
                   dir="ltr"
                 />
               </div>
               <div className="flex items-center gap-3 pt-4">
                 <button onClick={handleUpdateEmailCredentials} className="btn-primary flex-1">
-                  حفظ
+                  Ø­ÙØ¸
                 </button>
                 <button onClick={() => setIsEditEmailModalOpen(false)} className="btn-secondary">
-                  إلغاء
+                  Ø¥Ù„ØºØ§Ø¡
                 </button>
               </div>
             </div>
@@ -1248,7 +1248,7 @@ const Services = () => {
           <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 animate-scale-in border border-border max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-border">
               <div>
-                <h2 className="text-xl font-bold text-foreground">إدارة المستخدمين</h2>
+                <h2 className="text-xl font-bold text-foreground">Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†</h2>
                 <p className="text-sm text-muted-foreground" dir="ltr">{selectedEmail.email}</p>
               </div>
               <button onClick={() => { setIsUsersModalOpen(false); setSelectedEmail(null); }} className="p-2 rounded-lg hover:bg-muted transition-colors">
@@ -1259,7 +1259,7 @@ const Services = () => {
               {selectedEmail.users.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground mb-4">لا يوجد مستخدمين مرتبطين بهذا الإيميل</p>
+                  <p className="text-muted-foreground mb-4">Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† Ù…Ø±ØªØ¨Ø·ÙŠÙ† Ø¨Ù‡Ø°Ø§ Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1275,12 +1275,12 @@ const Services = () => {
                             <span dir="ltr">{user.email}</span>
                             {user.phone && (
                               <>
-                                <span>•</span>
+                                <span>â€¢</span>
                                 <span dir="ltr">{user.phone}</span>
                               </>
                             )}
                             {user.customerId && (
-                              <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">عميل مربوط</span>
+                              <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">Ø¹Ù…ÙŠÙ„ Ù…Ø±Ø¨ÙˆØ·</span>
                             )}
                           </div>
                         </div>
@@ -1288,7 +1288,7 @@ const Services = () => {
                       <button
                         onClick={() => handleRemoveUser(user.id)}
                         className="p-2 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
-                        title="إزالة المستخدم"
+                        title="Ø¥Ø²Ø§Ù„Ø© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1300,7 +1300,7 @@ const Services = () => {
             <div className="p-6 border-t border-border">
               <button onClick={() => setIsAddUserModalOpen(true)} className="btn-primary w-full">
                 <Plus className="w-4 h-4" />
-                إضافة مستخدم
+                Ø¥Ø¶Ø§ÙØ© Ù…Ø³ØªØ®Ø¯Ù…
               </button>
             </div>
           </div>
@@ -1318,8 +1318,8 @@ const Services = () => {
       {/* Delete Modal */}
       <DeleteConfirmModal
         isOpen={isDeleteModalOpen}
-        title={`حذف ${deleteTarget?.type === 'service' || deleteTarget?.type === 'dynamic' ? 'الخدمة' : deleteTarget?.type === 'account' ? 'الحساب' : 'الإيميل'}`}
-        message="هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء."
+        title={`Ø­Ø°Ù ${deleteTarget?.type === 'service' || deleteTarget?.type === 'dynamic' ? 'Ø§Ù„Ø®Ø¯Ù…Ø©' : deleteTarget?.type === 'account' ? 'Ø§Ù„Ø­Ø³Ø§Ø¨' : 'Ø§Ù„Ø¥ÙŠÙ…ÙŠÙ„'}`}
+        message="Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø§Ù„Ø­Ø°ÙØŸ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡."
         onConfirm={handleDelete}
         onClose={() => { setIsDeleteModalOpen(false); setDeleteTarget(null); }}
       />
@@ -1328,3 +1328,4 @@ const Services = () => {
 };
 
 export default Services;
+

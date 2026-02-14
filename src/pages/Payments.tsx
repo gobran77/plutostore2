@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Header } from '@/components/layout/Header';
 import { DataTable } from '@/components/common/DataTable';
@@ -77,8 +77,8 @@ const Payments = () => {
           const paymentStatus = String(s?.paymentStatus || 'paid');
           const services = Array.isArray(s?.services) ? s.services : [];
           const serviceName = services.length > 0
-            ? String(services[0]?.serviceName || 'خدمة')
-            : String(s?.service_name || 'خدمة');
+            ? String(services[0]?.serviceName || 'Ø®Ø¯Ù…Ø©')
+            : String(s?.service_name || 'Ø®Ø¯Ù…Ø©');
 
           return {
             id: String(s?.id || ''),
@@ -135,7 +135,7 @@ const Payments = () => {
   const handlePaymentMethodsChange = (methods: PaymentMethodType[]) => {
     setPaymentMethods(methods);
     localStorage.setItem(PAYMENT_METHODS_STORAGE_KEY, JSON.stringify(methods));
-    toast.success('تم حفظ طرق الدفع');
+    toast.success('ØªÙ… Ø­ÙØ¸ Ø·Ø±Ù‚ Ø§Ù„Ø¯ÙØ¹');
   };
 
   const handleAddPayment = (paymentData: any) => {
@@ -151,7 +151,7 @@ const Payments = () => {
     addToBalance(paymentData.currency, paymentData.amount);
     loadDeferredDebts();
     
-    toast.success('تم تسجيل الدفعة بنجاح');
+    toast.success('ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯ÙØ¹Ø© Ø¨Ù†Ø¬Ø§Ø­');
   };
 
   const handleEditPayment = (updatedPayment: Payment) => {
@@ -160,7 +160,7 @@ const Payments = () => {
     );
     setPayments(updated);
     updatePaymentInStorage(updatedPayment);
-    toast.success('تم تحديث الدفعة بنجاح');
+    toast.success('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¯ÙØ¹Ø© Ø¨Ù†Ø¬Ø§Ø­');
   };
 
   const handleDeletePayment = () => {
@@ -172,7 +172,7 @@ const Payments = () => {
       setPayments(updated);
       deletePaymentFromStorage(selectedPayment.id);
       loadDeferredDebts();
-      toast.success('تم حذف الدفعة بنجاح');
+      toast.success('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø¯ÙØ¹Ø© Ø¨Ù†Ø¬Ø§Ø­');
       setIsDeleteModalOpen(false);
       setSelectedPayment(null);
     }
@@ -186,7 +186,7 @@ const Payments = () => {
   const columns = [
     {
       key: 'payment',
-      header: 'الدفعة',
+      header: 'Ø§Ù„Ø¯ÙØ¹Ø©',
       render: (payment: ExtendedPayment) => {
         const Icon = getMethodIcon(payment.method);
         const style = getMethodStyle(payment.method);
@@ -198,7 +198,7 @@ const Payments = () => {
             <div>
               <p className="font-medium text-foreground">{payment.methodName || payment.method}</p>
               <p className="text-xs text-muted-foreground">
-                {payment.paidAt.toLocaleDateString('ar-SA')}
+                {payment.paidAt.toLocaleDateString('ar-SA-u-ca-gregory')}
               </p>
             </div>
           </div>
@@ -207,21 +207,21 @@ const Payments = () => {
     },
     {
       key: 'customer',
-      header: 'العميل',
+      header: 'Ø§Ù„Ø¹Ù…ÙŠÙ„',
       render: (payment: ExtendedPayment) => (
         <span className="text-foreground">{payment.customerName}</span>
       ),
     },
     {
       key: 'invoice',
-      header: 'الفاتورة',
+      header: 'Ø§Ù„ÙØ§ØªÙˆØ±Ø©',
       render: (payment: ExtendedPayment) => (
         <span className="text-primary font-medium">{payment.invoiceNumber}</span>
       ),
     },
     {
       key: 'amount',
-      header: 'المبلغ',
+      header: 'Ø§Ù„Ù…Ø¨Ù„Øº',
       render: (payment: ExtendedPayment) => (
         <span className="font-bold text-foreground">
           {payment.amount.toLocaleString()} {payment.currency}
@@ -230,7 +230,7 @@ const Payments = () => {
     },
     {
       key: 'reference',
-      header: 'المرجع',
+      header: 'Ø§Ù„Ù…Ø±Ø¬Ø¹',
       render: (payment: ExtendedPayment) => (
         <span className="text-muted-foreground text-sm font-mono">
           {payment.reference || '-'}
@@ -244,12 +244,12 @@ const Payments = () => {
         <ActionsMenu
           items={[
             {
-              label: 'عرض التفاصيل',
+              label: 'Ø¹Ø±Ø¶ Ø§Ù„ØªÙØ§ØµÙŠÙ„',
               icon: Eye,
               onClick: () => console.log('View:', payment),
             },
             {
-              label: 'تعديل',
+              label: 'ØªØ¹Ø¯ÙŠÙ„',
               icon: Edit,
               onClick: () => {
                 setSelectedPayment(payment);
@@ -257,7 +257,7 @@ const Payments = () => {
               },
             },
             {
-              label: 'حذف',
+              label: 'Ø­Ø°Ù',
               icon: Trash2,
               onClick: () => {
                 setSelectedPayment(payment);
@@ -304,29 +304,29 @@ const Payments = () => {
 
   const getFilterLabel = () => {
     switch (filterMethod) {
-      case 'card': return 'بطاقة';
-      case 'wallet': return 'محفظة';
-      case 'bank': return 'تحويل بنكي';
-      case 'transfer': return 'تحويل';
-      case 'cash': return 'نقداً';
-      default: return 'الكل';
+      case 'card': return 'Ø¨Ø·Ø§Ù‚Ø©';
+      case 'wallet': return 'Ù…Ø­ÙØ¸Ø©';
+      case 'bank': return 'ØªØ­ÙˆÙŠÙ„ Ø¨Ù†ÙƒÙŠ';
+      case 'transfer': return 'ØªØ­ÙˆÙŠÙ„';
+      case 'cash': return 'Ù†Ù‚Ø¯Ø§Ù‹';
+      default: return 'Ø§Ù„ÙƒÙ„';
     }
   };
 
   return (
     <MainLayout>
       <Header
-        title="المدفوعات"
-        subtitle={`${payments.length} عملية دفع`}
+        title="Ø§Ù„Ù…Ø¯ÙÙˆØ¹Ø§Øª"
+        subtitle={`${payments.length} Ø¹Ù…Ù„ÙŠØ© Ø¯ÙØ¹`}
         showAddButton
-        addButtonLabel="تسجيل دفعة"
+        addButtonLabel="ØªØ³Ø¬ÙŠÙ„ Ø¯ÙØ¹Ø©"
         onAddClick={() => setIsAddModalOpen(true)}
       />
 
       <div className="p-6 space-y-6 animate-fade-in">
         {deferredDebts.length > 0 && (
           <div className="bg-card rounded-xl p-4 border border-border">
-            <h3 className="font-semibold text-foreground mb-3">العملاء عليهم مدفوعات آجلة</h3>
+            <h3 className="font-semibold text-foreground mb-3">Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ Ø¹Ù„ÙŠÙ‡Ù… Ù…Ø¯ÙÙˆØ¹Ø§Øª Ø¢Ø¬Ù„Ø©</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {deferredDebts.slice(0, 8).map((debt) => (
                 <div key={debt.id} className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
@@ -339,7 +339,7 @@ const Payments = () => {
                   <p className="text-xs text-muted-foreground mt-1">{debt.serviceName}</p>
                   {debt.dueDate && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      الاستحقاق: {debt.dueDate.toLocaleDateString('ar-SA')}
+                      Ø§Ù„Ø§Ø³ØªØ­Ù‚Ø§Ù‚: {debt.dueDate.toLocaleDateString('ar-SA-u-ca-gregory')}
                     </p>
                   )}
                 </div>
@@ -353,7 +353,7 @@ const Payments = () => {
           <div className="bg-card rounded-xl p-4 border border-border">
             <div className="flex items-center gap-2 mb-1">
               <p className="text-sm text-muted-foreground">
-                {filterMethod === 'all' ? 'إجمالي المدفوعات' : `مدفوعات ${getFilterLabel()}`}
+                {filterMethod === 'all' ? 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¯ÙÙˆØ¹Ø§Øª' : `Ù…Ø¯ÙÙˆØ¹Ø§Øª ${getFilterLabel()}`}
               </p>
               {filterMethod !== 'all' && (
                 <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
@@ -362,48 +362,48 @@ const Payments = () => {
               )}
             </div>
             <p className="text-2xl font-bold text-success">{stats.total.count}</p>
-            <p className="text-xs text-muted-foreground mt-1">عملية دفع</p>
+            <p className="text-xs text-muted-foreground mt-1">Ø¹Ù…Ù„ÙŠØ© Ø¯ÙØ¹</p>
           </div>
           
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">إجمالي المبلغ</p>
+            <p className="text-sm text-muted-foreground">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¨Ù„Øº</p>
             <p className="text-2xl font-bold text-primary">
               {stats.total.amount.toLocaleString()}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               {Object.keys(stats.byCurrency).length > 1 
-                ? 'عملات متعددة' 
-                : Object.keys(stats.byCurrency)[0] || 'ر.س'}
+                ? 'Ø¹Ù…Ù„Ø§Øª Ù…ØªØ¹Ø¯Ø¯Ø©' 
+                : Object.keys(stats.byCurrency)[0] || 'Ø±.Ø³'}
             </p>
           </div>
           
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">متوسط الدفعة</p>
+            <p className="text-sm text-muted-foreground">Ù…ØªÙˆØ³Ø· Ø§Ù„Ø¯ÙØ¹Ø©</p>
             <p className="text-2xl font-bold text-warning">
               {stats.avgAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">لكل عملية</p>
+            <p className="text-xs text-muted-foreground mt-1">Ù„ÙƒÙ„ Ø¹Ù…Ù„ÙŠØ©</p>
           </div>
           
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">طرق الدفع النشطة</p>
+            <p className="text-sm text-muted-foreground">Ø·Ø±Ù‚ Ø§Ù„Ø¯ÙØ¹ Ø§Ù„Ù†Ø´Ø·Ø©</p>
             <p className="text-2xl font-bold text-accent">
               {paymentMethods.filter(m => m.active).length}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">من {paymentMethods.length} طريقة</p>
+            <p className="text-xs text-muted-foreground mt-1">Ù…Ù† {paymentMethods.length} Ø·Ø±ÙŠÙ‚Ø©</p>
           </div>
         </div>
 
         {/* Currency Breakdown Report */}
         {Object.keys(stats.byCurrency).length > 0 && (
           <div className="bg-card rounded-xl p-4 border border-border">
-            <h3 className="font-semibold text-foreground mb-3">تقرير المدفوعات حسب العملة</h3>
+            <h3 className="font-semibold text-foreground mb-3">ØªÙ‚Ø±ÙŠØ± Ø§Ù„Ù…Ø¯ÙÙˆØ¹Ø§Øª Ø­Ø³Ø¨ Ø§Ù„Ø¹Ù…Ù„Ø©</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {Object.entries(stats.byCurrency).map(([currency, data]) => (
                 <div key={currency} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div>
                     <p className="font-medium text-foreground">{currency}</p>
-                    <p className="text-xs text-muted-foreground">{data.count} عملية</p>
+                    <p className="text-xs text-muted-foreground">{data.count} Ø¹Ù…Ù„ÙŠØ©</p>
                   </div>
                   <p className="text-lg font-bold text-success">{data.amount.toLocaleString()}</p>
                 </div>
@@ -415,7 +415,7 @@ const Payments = () => {
         {/* Method Distribution (only show when filter is 'all') */}
         {filterMethod === 'all' && Object.keys(stats.byMethod).length > 0 && (
           <div className="bg-card rounded-xl p-4 border border-border">
-            <h3 className="font-semibold text-foreground mb-3">توزيع طرق الدفع</h3>
+            <h3 className="font-semibold text-foreground mb-3">ØªÙˆØ²ÙŠØ¹ Ø·Ø±Ù‚ Ø§Ù„Ø¯ÙØ¹</h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {Object.entries(stats.byMethod).map(([method, data]) => {
                 const Icon = getMethodIcon(method);
@@ -445,18 +445,18 @@ const Payments = () => {
         <div className="flex items-center gap-3 flex-wrap">
           <button className="btn-secondary">
             <Filter className="w-4 h-4" />
-            تصفية
+            ØªØµÙÙŠØ©
           </button>
           <button className="btn-ghost">
             <Download className="w-4 h-4" />
-            تصدير
+            ØªØµØ¯ÙŠØ±
           </button>
           <button 
             onClick={() => setIsMethodsModalOpen(true)}
             className="btn-ghost"
           >
             <Settings className="w-4 h-4" />
-            إدارة طرق الدفع
+            Ø¥Ø¯Ø§Ø±Ø© Ø·Ø±Ù‚ Ø§Ù„Ø¯ÙØ¹
           </button>
           <div className="flex items-center gap-2 mr-auto">
             <button 
@@ -467,7 +467,7 @@ const Payments = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              الكل
+              Ø§Ù„ÙƒÙ„
             </button>
             <button 
               onClick={() => setFilterMethod('card')}
@@ -477,7 +477,7 @@ const Payments = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              بطاقة
+              Ø¨Ø·Ø§Ù‚Ø©
             </button>
             <button 
               onClick={() => setFilterMethod('bank')}
@@ -487,7 +487,7 @@ const Payments = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              تحويل بنكي
+              ØªØ­ÙˆÙŠÙ„ Ø¨Ù†ÙƒÙŠ
             </button>
             <button 
               onClick={() => setFilterMethod('cash')}
@@ -497,7 +497,7 @@ const Payments = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              نقداً
+              Ù†Ù‚Ø¯Ø§Ù‹
             </button>
           </div>
         </div>
@@ -533,8 +533,8 @@ const Payments = () => {
       {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={isDeleteModalOpen}
-        title="حذف الدفعة"
-        message="هل أنت متأكد من حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء."
+        title="Ø­Ø°Ù Ø§Ù„Ø¯ÙØ¹Ø©"
+        message="Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ù‡Ø°Ù‡ Ø§Ù„Ø¯ÙØ¹Ø©ØŸ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡."
         itemName={selectedPayment ? `${selectedPayment.amount} ${selectedPayment.currency} - ${selectedPayment.invoiceNumber}` : undefined}
         onClose={() => {
           setIsDeleteModalOpen(false);
@@ -555,3 +555,4 @@ const Payments = () => {
 };
 
 export default Payments;
+

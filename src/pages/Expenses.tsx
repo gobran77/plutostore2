@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Header } from '@/components/layout/Header';
 import { DataTable } from '@/components/common/DataTable';
@@ -122,14 +122,14 @@ const Expenses = () => {
     // Check if balance is sufficient
     const currentBalance = balances[currency] || 0;
     if (currentBalance < amount) {
-      setExpenseError(`رصيد ${getCurrencySymbol(currency)} غير كافٍ. الرصيد الحالي: ${currentBalance.toLocaleString()}`);
+      setExpenseError(`Ø±ØµÙŠØ¯ ${getCurrencySymbol(currency)} ØºÙŠØ± ÙƒØ§ÙÙ. Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø­Ø§Ù„ÙŠ: ${currentBalance.toLocaleString()}`);
       return;
     }
 
     // Deduct from balance
     const success = subtractFromBalance(currency, amount);
     if (!success) {
-      setExpenseError('فشل في خصم المبلغ من الرصيد');
+      setExpenseError('ÙØ´Ù„ ÙÙŠ Ø®ØµÙ… Ø§Ù„Ù…Ø¨Ù„Øº Ù…Ù† Ø§Ù„Ø±ØµÙŠØ¯');
       return;
     }
 
@@ -158,7 +158,7 @@ const Expenses = () => {
     // Reload balances
     setBalances(loadCurrencyBalances());
     
-    toast.success('تمت إضافة المصروف وخصمه من الرصيد');
+    toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù…ØµØ±ÙˆÙ ÙˆØ®ØµÙ…Ù‡ Ù…Ù† Ø§Ù„Ø±ØµÙŠØ¯');
   };
 
   const handleAddCategory = () => {
@@ -175,7 +175,7 @@ const Expenses = () => {
     setCategories([...categories, newCategory]);
     setCategoryForm({ name: '', type: 'other', description: '' });
     setIsAddCategoryModalOpen(false);
-    toast.success('تمت إضافة التصنيف بنجاح');
+    toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„ØªØµÙ†ÙŠÙ Ø¨Ù†Ø¬Ø§Ø­');
   };
 
   const handleDelete = () => {
@@ -194,10 +194,10 @@ const Expenses = () => {
       if (updated.length === 0) {
         localStorage.removeItem(EXPENSES_STORAGE_KEY);
       }
-      toast.success('تم حذف المصروف وإرجاع المبلغ للرصيد');
+      toast.success('ØªÙ… Ø­Ø°Ù Ø§Ù„Ù…ØµØ±ÙˆÙ ÙˆØ¥Ø±Ø¬Ø§Ø¹ Ø§Ù„Ù…Ø¨Ù„Øº Ù„Ù„Ø±ØµÙŠØ¯');
     } else {
       setCategories(categories.filter(c => c.id !== deleteTarget.id));
-      toast.success('تم حذف التصنيف');
+      toast.success('ØªÙ… Ø­Ø°Ù Ø§Ù„ØªØµÙ†ÙŠÙ');
     }
 
     setIsDeleteModalOpen(false);
@@ -215,7 +215,7 @@ const Expenses = () => {
   const columns = [
     {
       key: 'category',
-      header: 'التصنيف',
+      header: 'Ø§Ù„ØªØµÙ†ÙŠÙ',
       render: (expense: Expense) => {
         const category = categories.find(c => c.id === expense.categoryId);
         const Icon = getCategoryIcon(category?.type || 'other');
@@ -231,26 +231,26 @@ const Expenses = () => {
     },
     {
       key: 'description',
-      header: 'الوصف',
+      header: 'Ø§Ù„ÙˆØµÙ',
       render: (expense: Expense) => (
         <span className="text-muted-foreground">{expense.description || '-'}</span>
       ),
     },
     {
       key: 'amount',
-      header: 'المبلغ',
+      header: 'Ø§Ù„Ù…Ø¨Ù„Øº',
       render: (expense: Expense) => (
         <span className="font-bold text-destructive">
-          {new Intl.NumberFormat('ar-SA').format(expense.amount)} {getCurrencySymbol(expense.currency)}
+          {new Intl.NumberFormat('ar-SA-u-ca-gregory').format(expense.amount)} {getCurrencySymbol(expense.currency)}
         </span>
       ),
     },
     {
       key: 'date',
-      header: 'التاريخ',
+      header: 'Ø§Ù„ØªØ§Ø±ÙŠØ®',
       render: (expense: Expense) => (
         <span className="text-muted-foreground text-sm">
-          {expense.date.toLocaleDateString('ar-SA')}
+          {expense.date.toLocaleDateString('ar-SA-u-ca-gregory')}
         </span>
       ),
     },
@@ -261,7 +261,7 @@ const Expenses = () => {
         <ActionsMenu
           items={[
             {
-              label: 'حذف',
+              label: 'Ø­Ø°Ù',
               icon: Trash2,
               onClick: () => {
                 setDeleteTarget({ type: 'expense', id: expense.id, name: expense.categoryName });
@@ -279,8 +279,8 @@ const Expenses = () => {
   return (
     <MainLayout>
       <Header
-        title="المصروفات"
-        subtitle="إدارة وتتبع المصروفات والنفقات"
+        title="Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª"
+        subtitle="Ø¥Ø¯Ø§Ø±Ø© ÙˆØªØªØ¨Ø¹ Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª ÙˆØ§Ù„Ù†ÙÙ‚Ø§Øª"
         action={
           <div className="flex items-center gap-2">
             <button
@@ -288,14 +288,14 @@ const Expenses = () => {
               className="btn-secondary flex items-center gap-2"
             >
               <Tag className="w-4 h-4" />
-              <span>تصنيف جديد</span>
+              <span>ØªØµÙ†ÙŠÙ Ø¬Ø¯ÙŠØ¯</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="btn-primary flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              <span>إضافة مصروف</span>
+              <span>Ø¥Ø¶Ø§ÙØ© Ù…ØµØ±ÙˆÙ</span>
             </button>
           </div>
         }
@@ -307,11 +307,11 @@ const Expenses = () => {
           {supportedCurrencies.map((currency) => (
             <div key={currency.code} className="bg-card rounded-xl p-4 border border-border">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">إجمالي المصروفات ({currency.symbol})</span>
+                <span className="text-sm text-muted-foreground">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª ({currency.symbol})</span>
                 <Receipt className="w-4 h-4 text-destructive" />
               </div>
               <p className="text-xl font-bold text-destructive">
-                {new Intl.NumberFormat('ar-SA').format(totalsByCurrency[currency.code] || 0)} {currency.symbol}
+                {new Intl.NumberFormat('ar-SA-u-ca-gregory').format(totalsByCurrency[currency.code] || 0)} {currency.symbol}
               </p>
             </div>
           ))}
@@ -319,7 +319,7 @@ const Expenses = () => {
 
         {/* Categories */}
         <div className="bg-card rounded-xl p-4 border border-border">
-          <h3 className="font-semibold text-foreground mb-3">تصنيفات المصروفات</h3>
+          <h3 className="font-semibold text-foreground mb-3">ØªØµÙ†ÙŠÙØ§Øª Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª</h3>
           <div className="flex flex-wrap gap-2">
             {categories.map((category) => {
               const Icon = getCategoryIcon(category.type);
@@ -352,7 +352,7 @@ const Expenses = () => {
           data={expenses}
           columns={columns}
           keyExtractor={(e) => e.id}
-          emptyMessage="لا توجد مصروفات"
+          emptyMessage="Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…ØµØ±ÙˆÙØ§Øª"
         />
       </div>
 
@@ -362,7 +362,7 @@ const Expenses = () => {
           <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={() => { setIsAddModalOpen(false); setExpenseError(null); }} />
           <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in border border-border">
             <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-xl font-bold text-foreground">إضافة مصروف</h2>
+              <h2 className="text-xl font-bold text-foreground">Ø¥Ø¶Ø§ÙØ© Ù…ØµØ±ÙˆÙ</h2>
               <button onClick={() => { setIsAddModalOpen(false); setExpenseError(null); }} className="p-2 rounded-lg hover:bg-muted transition-colors">
                 <Plus className="w-5 h-5 text-muted-foreground rotate-45" />
               </button>
@@ -376,7 +376,7 @@ const Expenses = () => {
                   }`}>
                     <p className="text-xs text-muted-foreground">{c.name}</p>
                     <p className="font-bold text-foreground text-sm">
-                      {new Intl.NumberFormat('ar-SA').format(balances[c.code] || 0)} {c.symbol}
+                      {new Intl.NumberFormat('ar-SA-u-ca-gregory').format(balances[c.code] || 0)} {c.symbol}
                     </p>
                   </div>
                 ))}
@@ -391,13 +391,13 @@ const Expenses = () => {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">التصنيف</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Ø§Ù„ØªØµÙ†ÙŠÙ</label>
                 <select
                   value={expenseForm.categoryId}
                   onChange={(e) => setExpenseForm({ ...expenseForm, categoryId: e.target.value })}
                   className="input-field"
                 >
-                  <option value="">اختر التصنيف</option>
+                  <option value="">Ø§Ø®ØªØ± Ø§Ù„ØªØµÙ†ÙŠÙ</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -405,7 +405,7 @@ const Expenses = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">المبلغ</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Ø§Ù„Ù…Ø¨Ù„Øº</label>
                   <input
                     type="number"
                     value={expenseForm.amount}
@@ -416,7 +416,7 @@ const Expenses = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">العملة</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Ø§Ù„Ø¹Ù…Ù„Ø©</label>
                   <select
                     value={expenseForm.currency}
                     onChange={(e) => setExpenseForm({ ...expenseForm, currency: e.target.value })}
@@ -429,7 +429,7 @@ const Expenses = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">التاريخ</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Ø§Ù„ØªØ§Ø±ÙŠØ®</label>
                 <input
                   type="date"
                   value={expenseForm.date}
@@ -438,17 +438,17 @@ const Expenses = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">الوصف</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Ø§Ù„ÙˆØµÙ</label>
                 <textarea
                   value={expenseForm.description}
                   onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
                   className="input-field min-h-[80px] resize-none"
-                  placeholder="وصف المصروف..."
+                  placeholder="ÙˆØµÙ Ø§Ù„Ù…ØµØ±ÙˆÙ..."
                 />
               </div>
               <div className="flex items-center gap-3 pt-4">
-                <button onClick={handleAddExpense} className="btn-primary flex-1">إضافة</button>
-                <button onClick={() => setIsAddModalOpen(false)} className="btn-secondary">إلغاء</button>
+                <button onClick={handleAddExpense} className="btn-primary flex-1">Ø¥Ø¶Ø§ÙØ©</button>
+                <button onClick={() => setIsAddModalOpen(false)} className="btn-secondary">Ø¥Ù„ØºØ§Ø¡</button>
               </div>
             </div>
           </div>
@@ -461,48 +461,48 @@ const Expenses = () => {
           <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={() => setIsAddCategoryModalOpen(false)} />
           <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in border border-border">
             <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-xl font-bold text-foreground">إضافة تصنيف جديد</h2>
+              <h2 className="text-xl font-bold text-foreground">Ø¥Ø¶Ø§ÙØ© ØªØµÙ†ÙŠÙ Ø¬Ø¯ÙŠØ¯</h2>
               <button onClick={() => setIsAddCategoryModalOpen(false)} className="p-2 rounded-lg hover:bg-muted transition-colors">
                 <Plus className="w-5 h-5 text-muted-foreground rotate-45" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">اسم التصنيف</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Ø§Ø³Ù… Ø§Ù„ØªØµÙ†ÙŠÙ</label>
                 <input
                   type="text"
                   value={categoryForm.name}
                   onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
                   className="input-field"
-                  placeholder="مثال: رواتب الموظفين"
+                  placeholder="Ù…Ø«Ø§Ù„: Ø±ÙˆØ§ØªØ¨ Ø§Ù„Ù…ÙˆØ¸ÙÙŠÙ†"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">نوع التصنيف</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Ù†ÙˆØ¹ Ø§Ù„ØªØµÙ†ÙŠÙ</label>
                 <select
                   value={categoryForm.type}
                   onChange={(e) => setCategoryForm({ ...categoryForm, type: e.target.value as ExpenseCategory['type'] })}
                   className="input-field"
                 >
-                  <option value="transfers">تحويلات</option>
-                  <option value="purchases">مشتريات</option>
-                  <option value="subscriptions">اشتراكات مواقع</option>
-                  <option value="ads">إعلانات ممولة</option>
-                  <option value="other">أخرى</option>
+                  <option value="transfers">ØªØ­ÙˆÙŠÙ„Ø§Øª</option>
+                  <option value="purchases">Ù…Ø´ØªØ±ÙŠØ§Øª</option>
+                  <option value="subscriptions">Ø§Ø´ØªØ±Ø§ÙƒØ§Øª Ù…ÙˆØ§Ù‚Ø¹</option>
+                  <option value="ads">Ø¥Ø¹Ù„Ø§Ù†Ø§Øª Ù…Ù…ÙˆÙ„Ø©</option>
+                  <option value="other">Ø£Ø®Ø±Ù‰</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">الوصف (اختياري)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Ø§Ù„ÙˆØµÙ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)</label>
                 <textarea
                   value={categoryForm.description}
                   onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                   className="input-field min-h-[80px] resize-none"
-                  placeholder="وصف التصنيف..."
+                  placeholder="ÙˆØµÙ Ø§Ù„ØªØµÙ†ÙŠÙ..."
                 />
               </div>
               <div className="flex items-center gap-3 pt-4">
-                <button onClick={handleAddCategory} className="btn-primary flex-1">إضافة</button>
-                <button onClick={() => setIsAddCategoryModalOpen(false)} className="btn-secondary">إلغاء</button>
+                <button onClick={handleAddCategory} className="btn-primary flex-1">Ø¥Ø¶Ø§ÙØ©</button>
+                <button onClick={() => setIsAddCategoryModalOpen(false)} className="btn-secondary">Ø¥Ù„ØºØ§Ø¡</button>
               </div>
             </div>
           </div>
@@ -516,11 +516,12 @@ const Expenses = () => {
           setDeleteTarget(null);
         }}
         onConfirm={handleDelete}
-        title={deleteTarget?.type === 'category' ? 'حذف التصنيف' : 'حذف المصروف'}
-        message={`هل أنت متأكد من حذف "${deleteTarget?.name}"؟`}
+        title={deleteTarget?.type === 'category' ? 'Ø­Ø°Ù Ø§Ù„ØªØµÙ†ÙŠÙ' : 'Ø­Ø°Ù Ø§Ù„Ù…ØµØ±ÙˆÙ'}
+        message={`Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù "${deleteTarget?.name}"ØŸ`}
       />
     </MainLayout>
   );
 };
 
 export default Expenses;
+

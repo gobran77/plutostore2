@@ -454,7 +454,7 @@ export default function CustomerLogin() {
     e.preventDefault();
 
     if (!resetWhatsapp.trim()) {
-      toast.error('???? ??? ????????');
+      toast.error('يرجى إدخال رقم الواتساب');
       return;
     }
 
@@ -464,7 +464,7 @@ export default function CustomerLogin() {
       const customer = accounts.find((a) => isSameWhatsapp(String(a.whatsapp_number || ''), resetWhatsapp));
 
       if (!customer) {
-        toast.error('??? ???????? ??? ?????');
+        toast.error('لا يوجد حساب بهذا الرقم');
         return;
       }
 
@@ -472,12 +472,12 @@ export default function CustomerLogin() {
       const candidateEmail = storedEmail || resetEmailInput.trim().toLowerCase();
 
       if (!candidateEmail) {
-        toast.error('???? ????? ?????? ??????????');
+        toast.error('يرجى إدخال البريد الإلكتروني');
         return;
       }
 
       if (!EMAIL_REGEX.test(candidateEmail)) {
-        toast.error('???? ?????? ?????????? ??? ?????');
+        toast.error('صيغة البريد الإلكتروني غير صحيحة');
         return;
       }
 
@@ -488,7 +488,7 @@ export default function CustomerLogin() {
             String((a as any)?.email || '').trim().toLowerCase() === candidateEmail
         );
         if (emailExists) {
-          toast.error('?????? ?????????? ?????? ?? ???? ???');
+          toast.error('البريد الإلكتروني مستخدم من حساب آخر');
           return;
         }
       }
@@ -523,10 +523,10 @@ export default function CustomerLogin() {
         pending_email: storedEmail ? undefined : candidateEmail,
       });
       setStep('forgotReset');
-      toast.success('?? ????? ??? ????? ??????? ??? ?????? ??????????');
+      toast.success('تم إرسال كود إعادة التعيين إلى بريدك الإلكتروني');
     } catch (error) {
       console.error('Forgot password request failed:', error);
-      toast.error('???? ????? ??? ????? ???????');
+      toast.error('تعذر إرسال كود إعادة التعيين');
     } finally {
       setIsLoading(false);
     }
@@ -815,7 +815,7 @@ export default function CustomerLogin() {
 
 
               <div className="space-y-2">
-                <Label htmlFor="resetEmail" className="text-sm font-medium">?????? ?????????? (??? ??? ???? ???? ?????)</Label>
+                <Label htmlFor="resetEmail" className="text-sm font-medium">البريد الإلكتروني (إذا لم يكن مسجل مسبقاً)</Label>
                 <div className="relative">
                   <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
@@ -829,7 +829,7 @@ export default function CustomerLogin() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  ??? ?????? ???? ???? ????? ???? ???????? ????????.
+                  سيتم حفظه لأول مرة فقط لاستخدامه في استعادة الحساب.
                 </p>
               </div>
 
