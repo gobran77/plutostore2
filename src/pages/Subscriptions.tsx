@@ -117,7 +117,16 @@ const Subscriptions = () => {
     }
     try {
       const parsed = JSON.parse(savedSubscriptions);
-      const subscriptionsWithDates = parsed.map((s: any) => ({
+      const subscriptionsWithDates = parsed.map((s: any) => {
+        const totalPrice = Number(s?.totalPrice || 0);
+        const paidAmount =
+          typeof s?.paidAmount === 'number'
+            ? s.paidAmount
+            : typeof s?.paid_amount === 'number'
+            ? s.paid_amount
+            : totalPrice;
+
+        return ({
         ...s,
         customerName: fixTextEncoding(String(s?.customerName || '')),
         startDate: new Date(s.startDate),
@@ -138,8 +147,10 @@ const Subscriptions = () => {
             }))
           : [],
         paymentStatus: s.paymentStatus || 'paid',
-        paidAmount: s.paidAmount || s.totalPrice,
-      }));
+        // Keep 0 for deferred subscriptions; don't coerce to totalPrice on refresh.
+        paidAmount,
+      });
+      });
       setSubscriptions(subscriptionsWithDates);
       setSubscriptionsHydrated(true);
     } catch (e) {
