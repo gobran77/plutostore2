@@ -96,6 +96,7 @@ export default function CustomerLogin() {
   const [pendingCustomer, setPendingCustomer] = useState<PendingCustomer | null>(null);
 
   const [resetWhatsapp, setResetWhatsapp] = useState('');
+  const [resetEmailInput, setResetEmailInput] = useState('');
   const [resetCodeInput, setResetCodeInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -453,7 +454,7 @@ export default function CustomerLogin() {
     e.preventDefault();
 
     if (!resetWhatsapp.trim()) {
-      toast.error('أدخل رقم الواتساب');
+      toast.error('???? ??? ????????');
       return;
     }
 
@@ -463,21 +464,40 @@ export default function CustomerLogin() {
       const customer = accounts.find((a) => isSameWhatsapp(String(a.whatsapp_number || ''), resetWhatsapp));
 
       if (!customer) {
-        toast.error('رقم الواتساب غير موجود');
+        toast.error('??? ???????? ??? ?????');
         return;
       }
 
-      const email = String((customer as any)?.email || '').trim();
-      if (!email) {
-        toast.error('لا يوجد بريد إلكتروني مرتبط بهذا الحساب');
+      const storedEmail = String((customer as any)?.email || '').trim().toLowerCase();
+      const candidateEmail = storedEmail || resetEmailInput.trim().toLowerCase();
+
+      if (!candidateEmail) {
+        toast.error('???? ????? ?????? ??????????');
         return;
+      }
+
+      if (!EMAIL_REGEX.test(candidateEmail)) {
+        toast.error('???? ?????? ?????????? ??? ?????');
+        return;
+      }
+
+      if (!storedEmail) {
+        const emailExists = accounts.some(
+          (a) =>
+            a.id !== customer.id &&
+            String((a as any)?.email || '').trim().toLowerCase() === candidateEmail
+        );
+        if (emailExists) {
+          toast.error('?????? ?????????? ?????? ?? ???? ???');
+          return;
+        }
       }
 
       const resetCode = generateCode();
       await updateCustomerAccountRecord(customer.id, { activation_code: resetCode });
 
       const emailResult = await sendActivationOtpEmail({
-        to: email,
+        to: candidateEmail,
         customerName: customer.name,
         code: resetCode,
       });
@@ -499,13 +519,14 @@ export default function CustomerLogin() {
         },
         currency: customer.currency || 'SAR',
         activation_code: resetCode,
-        stored_email: email.toLowerCase(),
+        stored_email: storedEmail,
+        pending_email: storedEmail ? undefined : candidateEmail,
       });
       setStep('forgotReset');
-      toast.success('تم إرسال كود إعادة التعيين إلى البريد الإلكتروني');
+      toast.success('?? ????? ??? ????? ??????? ??? ?????? ??????????');
     } catch (error) {
       console.error('Forgot password request failed:', error);
-      toast.error('تعذر إرسال كود إعادة التعيين');
+      toast.error('???? ????? ??? ????? ???????');
     } finally {
       setIsLoading(false);
     }
@@ -542,9 +563,13 @@ export default function CustomerLogin() {
 
     setIsLoading(true);
     try {
-      await updateCustomerAccountRecord(pendingReset.id, {
+      const patch: Record<string, any> = {
         password_hash: newPassword,
-      });
+      };
+      if (!pendingReset.stored_email && pendingReset.pending_email) {
+        patch.email = String(pendingReset.pending_email).trim().toLowerCase();
+      }
+      await updateCustomerAccountRecord(pendingReset.id, patch);
 
       toast.success('تم تحديث كلمة المرور بنجاح');
       setStep('login');
@@ -553,6 +578,7 @@ export default function CustomerLogin() {
       setResetCodeInput('');
       setNewPassword('');
       setConfirmNewPassword('');
+      setResetEmailInput('');
       setPendingReset(null);
     } catch (error) {
       console.error('Password reset failed:', error);
@@ -570,6 +596,7 @@ export default function CustomerLogin() {
     setResetCodeInput('');
     setNewPassword('');
     setConfirmNewPassword('');
+    setResetEmailInput('');
     setPendingReset(null);
   };
 
@@ -783,6 +810,27 @@ export default function CustomerLogin() {
                   <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input id="resetWhatsapp" type="tel" placeholder="966XXXXXXXXX" value={resetWhatsapp} onChange={(e) => setResetWhatsapp(e.target.value)} className="pr-11 h-12 text-base" dir="ltr" />
                 </div>
+              </div>
+
+
+
+              <div className="space-y-2">
+                <Label htmlFor="resetEmail" className="text-sm font-medium">?????? ?????????? (??? ??? ???? ???? ?????)</Label>
+                <div className="relative">
+                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    id="resetEmail"
+                    type="email"
+                    placeholder="example@email.com"
+                    value={resetEmailInput}
+                    onChange={(e) => setResetEmailInput(e.target.value)}
+                    className="pr-11 h-12 text-base"
+                    dir="ltr"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  ??? ?????? ???? ???? ????? ???? ???????? ????????.
+                </p>
               </div>
 
               <Button type="submit" className="w-full h-12 text-base font-medium bg-gradient-primary hover:opacity-90 transition-opacity" disabled={isLoading}>
