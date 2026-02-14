@@ -362,13 +362,36 @@ const Services = () => {
           service.accounts.forEach((account) => {
             if (account.type !== 'shared') return;
             account.sharedEmails.forEach((sharedEmail) => {
+              // Always keep one base "available" slot row for each shared email.
+              const baseSlotId = `slot_${service.id}_${sharedEmail.id}`;
+              expectedSlotIds.add(baseSlotId);
+              slotWrites.push(
+                setDoc(
+                  doc(db, SERVICE_SLOTS_COLLECTION, baseSlotId),
+                  {
+                    id: baseSlotId,
+                    serviceId: String(service.id),
+                    serviceName: String(service.name || ''),
+                    type: account.type,
+                    emailId: String(sharedEmail.id),
+                    email: String(sharedEmail.email || ''),
+                    status: 'available',
+                    customerId: '',
+                    customerName: '',
+                    createdAt: toIso(sharedEmail.addedAt),
+                    updated_at: new Date().toISOString(),
+                  },
+                  { merge: true }
+                )
+              );
+
               sharedEmail.users.forEach((user) => {
-                const slotId = String(user.id || `slot_${service.id}_${sharedEmail.id}_${Date.now()}`);
+                const slotId = String(user.id || `${baseSlotId}_usr_${Date.now()}`);
                 expectedSlotIds.add(slotId);
                 slotWrites.push(
                   setDoc(
                     doc(db, SERVICE_SLOTS_COLLECTION, slotId),
-                      {
+                    {
                         id: slotId,
                         serviceId: String(service.id),
                         serviceName: String(service.name || ''),
