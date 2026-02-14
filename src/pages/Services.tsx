@@ -330,9 +330,12 @@ const Services = () => {
     });
 
     let cancelled = false;
-      const syncServices = async () => {
-        try {
-          const snapshot = await getDocs(collection(db, 'service_catalog_items'));
+    const syncServices = async () => {
+      try {
+        const [servicesSnapshot, slotsSnapshot] = await Promise.all([
+          getDocs(collection(db, 'service_catalog_items')),
+          getDocs(collection(db, SERVICE_SLOTS_COLLECTION)),
+        ]);
         if (cancelled) return;
 
         const nextIds = new Set(services.map((s) => String(s.id)));
@@ -343,25 +346,28 @@ const Services = () => {
         );
 
         const deletes: Promise<void>[] = [];
-        snapshot.docs.forEach((d) => {
+        servicesSnapshot.docs.forEach((d) => {
           if (!nextIds.has(d.id)) {
             deletes.push(deleteDoc(doc(db, 'service_catalog_items', d.id)));
           }
         });
-          if (deletes.length > 0) {
-            await Promise.all(deletes);
-          }
+        if (deletes.length > 0) {
+          await Promise.all(deletes);
+        }
 
-          const slotWrites: Promise<void>[] = [];
-          services.forEach((service) => {
-            service.accounts.forEach((account) => {
-              if (account.type !== 'shared') return;
-              account.sharedEmails.forEach((sharedEmail) => {
-                sharedEmail.users.forEach((user) => {
-                  const slotId = String(user.id || `slot_${service.id}_${sharedEmail.id}_${Date.now()}`);
-                  slotWrites.push(
-                    setDoc(
-                      doc(db, SERVICE_SLOTS_COLLECTION, slotId),
+        // Build expected slot ids from current in-app services state.
+        const expectedSlotIds = new Set<string>();
+        const slotWrites: Promise<void>[] = [];
+        services.forEach((service) => {
+          service.accounts.forEach((account) => {
+            if (account.type !== 'shared') return;
+            account.sharedEmails.forEach((sharedEmail) => {
+              sharedEmail.users.forEach((user) => {
+                const slotId = String(user.id || `slot_${service.id}_${sharedEmail.id}_${Date.now()}`);
+                expectedSlotIds.add(slotId);
+                slotWrites.push(
+                  setDoc(
+                    doc(db, SERVICE_SLOTS_COLLECTION, slotId),
                       {
                         id: slotId,
                         serviceId: String(service.id),
@@ -378,17 +384,29 @@ const Services = () => {
                       { merge: true }
                     )
                   );
-                });
               });
             });
           });
-          if (slotWrites.length > 0) {
-            await Promise.all(slotWrites);
+        });
+
+        // Remove stale slots (deleted service / deleted email / deleted user).
+        const slotDeletes: Promise<void>[] = [];
+        slotsSnapshot.docs.forEach((d) => {
+          if (!expectedSlotIds.has(d.id)) {
+            slotDeletes.push(deleteDoc(doc(db, SERVICE_SLOTS_COLLECTION, d.id)));
           }
-        } catch (error) {
-          console.error('Failed to sync services to Firestore:', error);
+        });
+
+        if (slotWrites.length > 0) {
+          await Promise.all(slotWrites);
         }
-      };
+        if (slotDeletes.length > 0) {
+          await Promise.all(slotDeletes);
+        }
+      } catch (error) {
+        console.error('Failed to sync services to Firestore:', error);
+      }
+    };
 
     void syncServices();
     return () => {
