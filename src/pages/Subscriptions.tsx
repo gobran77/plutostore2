@@ -152,12 +152,33 @@ const Subscriptions = () => {
   };
 
   const loadSubscriptions = async () => {
+    const loadLocalSubscriptions = (): Subscription[] => {
+      const savedSubscriptions = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
+      if (!savedSubscriptions) return [];
+      try {
+        const parsed = JSON.parse(savedSubscriptions);
+        return (Array.isArray(parsed) ? parsed : []).map((s: any) => normalizeSubscription(s));
+      } catch {
+        return [];
+      }
+    };
+
     if (db) {
       try {
         const snapshot = await getDocs(collection(db, SUBSCRIPTIONS_COLLECTION));
         if (!snapshot.empty) {
           const rows = snapshot.docs.map((d) => ({ ...d.data(), id: String((d.data() as any)?.id || d.id) }));
-          const subscriptionsWithDates = rows.map(normalizeSubscription);
+          const cloudSubscriptions = rows.map(normalizeSubscription);
+          const localSubscriptions = loadLocalSubscriptions();
+          const mergedById = new Map<string, Subscription>();
+
+          localSubscriptions.forEach((item) => mergedById.set(String(item.id), item));
+          cloudSubscriptions.forEach((item) => mergedById.set(String(item.id), item));
+
+          const subscriptionsWithDates = Array.from(mergedById.values()).sort(
+            (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+          );
+
           setSubscriptions(subscriptionsWithDates);
           setSubscriptionsHydrated(true);
           localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptionsWithDates));
