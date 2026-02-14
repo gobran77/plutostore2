@@ -106,11 +106,13 @@ const Subscriptions = () => {
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
   const [whatsAppData, setWhatsAppData] = useState<{ customerName: string; whatsappNumber: string; message: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [subscriptionsHydrated, setSubscriptionsHydrated] = useState(false);
 
   const loadSubscriptions = () => {
     const savedSubscriptions = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
     if (!savedSubscriptions) {
       setSubscriptions([]);
+      setSubscriptionsHydrated(true);
       return;
     }
     try {
@@ -139,9 +141,11 @@ const Subscriptions = () => {
         paidAmount: s.paidAmount || s.totalPrice,
       }));
       setSubscriptions(subscriptionsWithDates);
+      setSubscriptionsHydrated(true);
     } catch (e) {
       console.error('Error loading subscriptions:', e);
       setSubscriptions([]);
+      setSubscriptionsHydrated(true);
     }
   };
 
@@ -278,6 +282,8 @@ const Subscriptions = () => {
 
   // Save subscriptions to localStorage
   useEffect(() => {
+    if (!subscriptionsHydrated) return;
+
     if (subscriptions.length === 0) {
       localStorage.removeItem(SUBSCRIPTIONS_STORAGE_KEY);
       return;
@@ -285,7 +291,7 @@ const Subscriptions = () => {
     const nextSerialized = JSON.stringify(subscriptions);
     if (localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY) === nextSerialized) return;
     localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, nextSerialized);
-  }, [subscriptions]);
+  }, [subscriptions, subscriptionsHydrated]);
 
   // Send WhatsApp notification to customer
   const sendWhatsAppNotification = async (_subscription: Subscription, _customerWhatsapp: string) => {
