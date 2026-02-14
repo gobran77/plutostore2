@@ -718,7 +718,7 @@ const Subscriptions = () => {
             ``,
             `📱 *ملاحظة:*`,
             `للتسجيل ومتابعة تفاصيل حسابك، يرجى إنشاء حساب على الموقع التالي:`,
-            `https://plutostoreai.lovable.app`,
+            `https://plutostoreai.store`,
           ].filter(Boolean).join('\n');
           
           setWhatsAppData({
