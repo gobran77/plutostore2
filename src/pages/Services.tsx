@@ -24,6 +24,21 @@ const SERVICES_STORAGE_KEY = 'app_services';
 const CUSTOMERS_STORAGE_KEY = 'app_customers';
 const PAYMENT_METHODS_KEY = 'app_payment_methods';
 const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
+const SERVICE_SLOTS_COLLECTION = 'service_slots_items';
+
+type ServiceSlotRow = {
+  id?: string;
+  serviceId?: string;
+  serviceName?: string;
+  type?: string;
+  emailId?: string;
+  email?: string;
+  status?: string;
+  customerId?: string;
+  customerName?: string;
+  createdAt?: string;
+  updated_at?: string;
+};
 
 const Services = () => {
   const [services, setServices] = useState<Service[]>([]);
@@ -88,6 +103,87 @@ const Services = () => {
       }))
     );
 
+    const mergeSlotsIntoServices = (baseServices: Service[], slots: ServiceSlotRow[]): Service[] => {
+      const next = baseServices.map((service) => ({
+        ...service,
+        accounts: Array.isArray(service.accounts)
+          ? service.accounts.map((account) => ({
+              ...account,
+              sharedEmails: Array.isArray(account.sharedEmails)
+                ? account.sharedEmails.map((email) => ({
+                    ...email,
+                    users: Array.isArray(email.users) ? [...email.users] : [],
+                  }))
+                : [],
+            }))
+          : [],
+      }));
+
+      const serviceById = new Map(next.map((service) => [String(service.id), service]));
+
+      slots.forEach((slot) => {
+        const serviceId = String(slot?.serviceId || '');
+        if (!serviceId) return;
+
+        let service = serviceById.get(serviceId);
+        if (!service) {
+          service = {
+            id: serviceId,
+            name: String(slot?.serviceName || serviceId),
+            defaultType: (slot?.type === 'private' ? 'private' : 'shared') as ServiceType,
+            pricing: [],
+            createdAt: new Date(slot?.createdAt || Date.now()),
+            accounts: [],
+          };
+          serviceById.set(serviceId, service);
+          next.unshift(service);
+        }
+
+        const accountType = (slot?.type === 'private' ? 'private' : 'shared') as ServiceType;
+        let account = service.accounts.find((a) => a.type === accountType);
+        if (!account) {
+          account = {
+            id: `acc_${service.id}_${accountType}`,
+            type: accountType,
+            sharedEmails: [],
+            createdAt: new Date(slot?.createdAt || Date.now()),
+          };
+          service.accounts.unshift(account);
+        }
+
+        const emailId = String(slot?.emailId || `eml_${service.id}_${String(slot?.email || 'shared')}`);
+        const emailValue = String(slot?.email || '');
+        let email = account.sharedEmails.find((e) => String(e.id) === emailId || (emailValue && e.email === emailValue));
+        if (!email) {
+          email = {
+            id: emailId,
+            email: emailValue,
+            password: '',
+            users: [],
+            addedAt: new Date(slot?.createdAt || Date.now()),
+          };
+          account.sharedEmails.unshift(email);
+        }
+
+        const isAssigned = String(slot?.status || '').toLowerCase() === 'assigned' || Boolean(slot?.customerId) || Boolean(slot?.customerName);
+        if (!isAssigned) return;
+
+        const userId = String(slot?.id || `${service.id}_${email.id}_${String(slot?.customerId || Date.now())}`);
+        const existingUser = email.users.find((u) => String(u.id) === userId);
+        if (existingUser) return;
+
+        email.users.unshift({
+          id: userId,
+          customerId: String(slot?.customerId || ''),
+          name: String(slot?.customerName || 'مستخدم'),
+          email: emailValue,
+          linkedAt: new Date(slot?.updated_at || slot?.createdAt || Date.now()),
+        });
+      });
+
+      return next;
+    };
+
     const loadServices = async () => {
       const getLocalServices = (): Service[] => {
         const saved = localStorage.getItem(SERVICES_STORAGE_KEY);
@@ -101,11 +197,16 @@ const Services = () => {
 
       try {
         if (db) {
-          const snapshot = await getDocs(collection(db, 'service_catalog_items'));
-          const fromFirestore = snapshot.docs.map((d) => {
+          const [servicesSnap, slotsSnap] = await Promise.all([
+            getDocs(collection(db, 'service_catalog_items')),
+            getDocs(collection(db, SERVICE_SLOTS_COLLECTION)),
+          ]);
+
+          const fromFirestore = servicesSnap.docs.map((d) => {
             const row = d.data() as any;
             return { ...row, id: String(row?.id || d.id) };
           });
+          const slotRows = slotsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as ServiceSlotRow) }));
 
           if (fromFirestore.length > 0) {
             const normalized = normalizeServices(fromFirestore);
@@ -120,8 +221,9 @@ const Services = () => {
               return hasCloudAccounts ? service : { ...service, accounts: local.accounts || [] };
             });
 
-            setServices(merged);
-            localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(merged));
+            const mergedWithSlots = mergeSlotsIntoServices(merged, slotRows);
+            setServices(mergedWithSlots);
+            localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(mergedWithSlots));
             return;
           }
 
@@ -204,8 +306,8 @@ const Services = () => {
   useEffect(() => {
     if (!db) return;
 
-    const toIso = (value: any) =>
-      value instanceof Date ? value.toISOString() : new Date(value || Date.now()).toISOString();
+      const toIso = (value: any) =>
+        value instanceof Date ? value.toISOString() : new Date(value || Date.now()).toISOString();
 
     const serialize = (service: Service) => ({
       ...service,
@@ -228,9 +330,9 @@ const Services = () => {
     });
 
     let cancelled = false;
-    const syncServices = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, 'service_catalog_items'));
+      const syncServices = async () => {
+        try {
+          const snapshot = await getDocs(collection(db, 'service_catalog_items'));
         if (cancelled) return;
 
         const nextIds = new Set(services.map((s) => String(s.id)));
@@ -246,13 +348,47 @@ const Services = () => {
             deletes.push(deleteDoc(doc(db, 'service_catalog_items', d.id)));
           }
         });
-        if (deletes.length > 0) {
-          await Promise.all(deletes);
+          if (deletes.length > 0) {
+            await Promise.all(deletes);
+          }
+
+          const slotWrites: Promise<void>[] = [];
+          services.forEach((service) => {
+            service.accounts.forEach((account) => {
+              if (account.type !== 'shared') return;
+              account.sharedEmails.forEach((sharedEmail) => {
+                sharedEmail.users.forEach((user) => {
+                  const slotId = String(user.id || `slot_${service.id}_${sharedEmail.id}_${Date.now()}`);
+                  slotWrites.push(
+                    setDoc(
+                      doc(db, SERVICE_SLOTS_COLLECTION, slotId),
+                      {
+                        id: slotId,
+                        serviceId: String(service.id),
+                        serviceName: String(service.name || ''),
+                        type: account.type,
+                        emailId: String(sharedEmail.id),
+                        email: String(sharedEmail.email || ''),
+                        status: 'assigned',
+                        customerId: String(user.customerId || ''),
+                        customerName: String(user.name || ''),
+                        createdAt: toIso(user.linkedAt),
+                        updated_at: new Date().toISOString(),
+                      },
+                      { merge: true }
+                    )
+                  );
+                });
+              });
+            });
+          });
+          if (slotWrites.length > 0) {
+            await Promise.all(slotWrites);
+          }
+        } catch (error) {
+          console.error('Failed to sync services to Firestore:', error);
         }
-      } catch (error) {
-        console.error('Failed to sync services to Firestore:', error);
-      }
-    };
+      };
 
     void syncServices();
     return () => {
