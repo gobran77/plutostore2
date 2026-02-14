@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Header } from '@/components/layout/Header';
 import { DataTable } from '@/components/common/DataTable';
@@ -51,7 +51,7 @@ const Invoices = () => {
     const updated = [newInvoice, ...invoices];
     setInvoices(updated);
     saveInvoices(updated);
-    toast.success('ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø¨Ù†Ø¬Ø§Ø­');
+    toast.success('تم إنشاء الفاتورة بنجاح');
   };
 
   const handleEditInvoice = (updatedInvoice: Invoice) => {
@@ -59,7 +59,7 @@ const Invoices = () => {
       inv.id === updatedInvoice.id ? updatedInvoice : inv
     ));
     updateInvoice(updatedInvoice);
-    toast.success('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø¨Ù†Ø¬Ø§Ø­');
+    toast.success('تم تحديث الفاتورة بنجاح');
   };
 
   const handleDeleteInvoice = () => {
@@ -67,7 +67,7 @@ const Invoices = () => {
       const updated = invoices.filter(inv => inv.id !== selectedInvoice.id);
       setInvoices(updated);
       deleteInvoice(selectedInvoice.id);
-      toast.success('ØªÙ… Ø­Ø°Ù Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø¨Ù†Ø¬Ø§Ø­');
+      toast.success('تم حذف الفاتورة بنجاح');
       setIsDeleteModalOpen(false);
       setSelectedInvoice(null);
     }
@@ -81,7 +81,7 @@ const Invoices = () => {
   const columns = [
     {
       key: 'invoice',
-      header: 'Ø§Ù„ÙØ§ØªÙˆØ±Ø©',
+      header: 'الفاتورة',
       render: (invoice: Invoice) => (
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-lg bg-primary/10">
@@ -90,7 +90,7 @@ const Invoices = () => {
           <div>
             <p className="font-medium text-foreground">{invoice.invoiceNumber}</p>
             <p className="text-xs text-muted-foreground">
-              {invoice.issuedAt.toLocaleDateString('ar-SA-u-ca-gregory')}
+              {invoice.issuedAt.toLocaleDateString('ar-SA')}
             </p>
           </div>
         </div>
@@ -98,35 +98,35 @@ const Invoices = () => {
     },
     {
       key: 'customer',
-      header: 'Ø§Ù„Ø¹Ù…ÙŠÙ„',
+      header: 'العميل',
       render: (invoice: Invoice) => (
         <span className="text-foreground">{invoice.customerName}</span>
       ),
     },
     {
       key: 'amount',
-      header: 'Ø§Ù„Ù…Ø¨Ù„Øº',
+      header: 'المبلغ',
       render: (invoice: Invoice) => (
         <div>
           <p className="font-semibold text-foreground">
             {invoice.amount.toLocaleString()} {invoice.currency}
           </p>
           {invoice.discount > 0 && (
-            <p className="text-xs text-success">Ø®ØµÙ…: {invoice.discount}</p>
+            <p className="text-xs text-success">خصم: {invoice.discount}</p>
           )}
         </div>
       ),
     },
     {
       key: 'tax',
-      header: 'Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©',
+      header: 'الضريبة',
       render: (invoice: Invoice) => (
         <span className="text-muted-foreground">{invoice.tax} {invoice.currency}</span>
       ),
     },
     {
       key: 'total',
-      header: 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ',
+      header: 'الإجمالي',
       render: (invoice: Invoice) => {
         const total = invoice.amount + invoice.tax - invoice.discount;
         return (
@@ -138,20 +138,20 @@ const Invoices = () => {
     },
     {
       key: 'dueAt',
-      header: 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªØ­Ù‚Ø§Ù‚',
+      header: 'تاريخ الاستحقاق',
       render: (invoice: Invoice) => {
         const isOverdue = invoice.status !== 'paid' && new Date(invoice.dueAt) < new Date();
         return (
           <span className={isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}>
-            {invoice.dueAt.toLocaleDateString('ar-SA-u-ca-gregory')}
-            {isOverdue && ' (Ù…ØªØ£Ø®Ø±)'}
+            {invoice.dueAt.toLocaleDateString('ar-SA')}
+            {isOverdue && ' (متأخر)'}
           </span>
         );
       },
     },
     {
       key: 'status',
-      header: 'Ø§Ù„Ø­Ø§Ù„Ø©',
+      header: 'الحالة',
       render: (invoice: Invoice) => <StatusBadge status={invoice.status} />,
     },
     {
@@ -161,12 +161,12 @@ const Invoices = () => {
         <ActionsMenu
           items={[
             {
-              label: 'Ø¹Ø±Ø¶ Ø§Ù„ØªÙØ§ØµÙŠÙ„',
+              label: 'عرض التفاصيل',
               icon: Eye,
               onClick: () => console.log('View:', invoice),
             },
             {
-              label: 'ØªØ¹Ø¯ÙŠÙ„',
+              label: 'تعديل',
               icon: Edit,
               onClick: () => {
                 setSelectedInvoice(invoice);
@@ -174,12 +174,12 @@ const Invoices = () => {
               },
             },
             {
-              label: 'ØªØ­Ù…ÙŠÙ„ PDF',
+              label: 'تحميل PDF',
               icon: Download,
-              onClick: () => toast.info('Ø³ØªØªÙˆÙØ± Ù‡Ø°Ù‡ Ø§Ù„Ù…ÙŠØ²Ø© Ù‚Ø±ÙŠØ¨Ø§Ù‹'),
+              onClick: () => toast.info('ستتوفر هذه الميزة قريباً'),
             },
             {
-              label: 'Ø­Ø°Ù',
+              label: 'حذف',
               icon: Trash2,
               onClick: () => {
                 setSelectedInvoice(invoice);
@@ -202,10 +202,10 @@ const Invoices = () => {
   return (
     <MainLayout>
       <Header
-        title="Ø§Ù„ÙÙˆØ§ØªÙŠØ±"
-        subtitle={`${invoices.length} ÙØ§ØªÙˆØ±Ø©`}
+        title="الفواتير"
+        subtitle={`${invoices.length} فاتورة`}
         showAddButton
-        addButtonLabel="Ø¥Ù†Ø´Ø§Ø¡ ÙØ§ØªÙˆØ±Ø©"
+        addButtonLabel="إنشاء فاتورة"
         onAddClick={() => setIsAddModalOpen(true)}
       />
 
@@ -213,19 +213,19 @@ const Invoices = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ÙÙˆØ§ØªÙŠØ±</p>
+            <p className="text-sm text-muted-foreground">إجمالي الفواتير</p>
             <p className="text-2xl font-bold text-foreground">{invoices.length}</p>
           </div>
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Ø§Ù„Ù…Ø¯ÙÙˆØ¹Ø©</p>
-            <p className="text-2xl font-bold text-success">{totalPaid.toLocaleString()} Ø±.Ø³</p>
+            <p className="text-sm text-muted-foreground">المدفوعة</p>
+            <p className="text-2xl font-bold text-success">{totalPaid.toLocaleString()} ر.س</p>
           </div>
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">ØºÙŠØ± Ø§Ù„Ù…Ø¯ÙÙˆØ¹Ø©</p>
-            <p className="text-2xl font-bold text-destructive">{totalUnpaid.toLocaleString()} Ø±.Ø³</p>
+            <p className="text-sm text-muted-foreground">غير المدفوعة</p>
+            <p className="text-2xl font-bold text-destructive">{totalUnpaid.toLocaleString()} ر.س</p>
           </div>
           <div className="bg-card rounded-xl p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Ù…ØªØ£Ø®Ø±Ø©</p>
+            <p className="text-sm text-muted-foreground">متأخرة</p>
             <p className="text-2xl font-bold text-warning">{overdueCount}</p>
           </div>
         </div>
@@ -234,11 +234,11 @@ const Invoices = () => {
         <div className="flex items-center gap-3 flex-wrap">
           <button className="btn-secondary">
             <Filter className="w-4 h-4" />
-            ØªØµÙÙŠØ©
+            تصفية
           </button>
           <button className="btn-ghost">
             <Download className="w-4 h-4" />
-            ØªØµØ¯ÙŠØ±
+            تصدير
           </button>
           <div className="flex items-center gap-2 mr-auto">
             <button 
@@ -249,7 +249,7 @@ const Invoices = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              Ø§Ù„ÙƒÙ„
+              الكل
             </button>
             <button 
               onClick={() => setFilterStatus('paid')}
@@ -259,7 +259,7 @@ const Invoices = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              Ù…Ø¯ÙÙˆØ¹Ø©
+              مدفوعة
             </button>
             <button 
               onClick={() => setFilterStatus('unpaid')}
@@ -269,7 +269,7 @@ const Invoices = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              ØºÙŠØ± Ù…Ø¯ÙÙˆØ¹Ø©
+              غير مدفوعة
             </button>
             <button 
               onClick={() => setFilterStatus('partially_paid')}
@@ -279,7 +279,7 @@ const Invoices = () => {
                   : 'hover:bg-muted text-muted-foreground'
               }`}
             >
-              Ù…Ø¯ÙÙˆØ¹Ø© Ø¬Ø²Ø¦ÙŠØ§Ù‹
+              مدفوعة جزئياً
             </button>
           </div>
         </div>
@@ -314,8 +314,8 @@ const Invoices = () => {
       {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={isDeleteModalOpen}
-        title="Ø­Ø°Ù Ø§Ù„ÙØ§ØªÙˆØ±Ø©"
-        message="Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ù‡Ø°Ù‡ Ø§Ù„ÙØ§ØªÙˆØ±Ø©ØŸ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡."
+        title="حذف الفاتورة"
+        message="هل أنت متأكد من حذف هذه الفاتورة؟ لا يمكن التراجع عن هذا الإجراء."
         itemName={selectedInvoice?.invoiceNumber}
         onClose={() => {
           setIsDeleteModalOpen(false);
@@ -328,4 +328,3 @@ const Invoices = () => {
 };
 
 export default Invoices;
-

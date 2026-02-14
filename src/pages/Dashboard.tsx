@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Header } from '@/components/layout/Header';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -146,7 +146,7 @@ const Dashboard = () => {
     
     // Show notification for overdue payments
     if (overdue.length > 0) {
-      toast.warning(`Ù„Ø¯ÙŠÙƒ ${overdue.length} Ø¯ÙØ¹Ø© Ù…ØªØ£Ø®Ø±Ø© ØªØ­ØªØ§Ø¬ Ø¥Ù„Ù‰ Ù…ØªØ§Ø¨Ø¹Ø©!`, {
+      toast.warning(`لديك ${overdue.length} دفعة متأخرة تحتاج إلى متابعة!`, {
         duration: 5000,
         id: 'overdue-payments',
       });
@@ -167,7 +167,7 @@ const Dashboard = () => {
     // Recalculate balances after exchange
     setCurrencyBalances(recalculateBalances());
     
-    toast.success(`ØªÙ… ØªØ­ÙˆÙŠÙ„ ${exchange.amount} ${getCurrencySymbol(exchange.fromCurrency)} Ø¥Ù„Ù‰ ${exchange.result.toFixed(2)} ${getCurrencySymbol(exchange.toCurrency)}`);
+    toast.success(`تم تحويل ${exchange.amount} ${getCurrencySymbol(exchange.fromCurrency)} إلى ${exchange.result.toFixed(2)} ${getCurrencySymbol(exchange.toCurrency)}`);
   };
 
   // Handle cash addition
@@ -185,7 +185,7 @@ const Dashboard = () => {
     // Recalculate balances
     setCurrencyBalances(recalculateBalances());
     
-    toast.success(`ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© ${data.amount} ${getCurrencySymbol(data.currency)} Ù„Ù„ØµÙ†Ø¯ÙˆÙ‚`);
+    toast.success(`تمت إضافة ${data.amount} ${getCurrencySymbol(data.currency)} للصندوق`);
   };
 
   // Handle balance reset
@@ -233,7 +233,7 @@ const Dashboard = () => {
   // Format currency
   const formatCurrency = (amount: number, currency?: string) => {
     const symbol = currency ? getCurrencySymbol(currency) : currencySymbol;
-    return `${new Intl.NumberFormat('ar-SA-u-ca-gregory').format(amount)} ${symbol}`;
+    return `${new Intl.NumberFormat('ar-SA').format(amount)} ${symbol}`;
   };
 
   // Calculate totals per currency for "all" view
@@ -252,8 +252,8 @@ const Dashboard = () => {
   return (
     <MainLayout>
       <Header
-        title="Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…"
-        subtitle="Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒØŒ Ø¥Ù„ÙŠÙƒ Ù†Ø¸Ø±Ø© Ø¹Ø§Ù…Ø© Ø¹Ù„Ù‰ Ù†Ø´Ø§Ø·Ùƒ"
+        title="لوحة التحكم"
+        subtitle="مرحباً بك، إليك نظرة عامة على نشاطك"
         action={
           <div className="flex items-center gap-1 md:gap-2 flex-wrap">
             <button
@@ -261,21 +261,21 @@ const Dashboard = () => {
               className="btn-ghost flex items-center gap-1 md:gap-2 text-destructive hover:bg-destructive/10 text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2"
             >
               <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">ØªØµÙÙŠØ±</span>
+              <span className="hidden sm:inline">تصفير</span>
             </button>
             <button
               onClick={() => setIsCashModalOpen(true)}
               className="btn-secondary flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2"
             >
               <PlusCircle className="w-3 h-3 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">Ø²ÙŠØ§Ø¯Ø© Ø§Ù„ØµÙ†Ø¯ÙˆÙ‚</span>
+              <span className="hidden sm:inline">زيادة الصندوق</span>
             </button>
             <button
               onClick={() => setIsExchangeModalOpen(true)}
               className="btn-primary flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-1.5 md:py-2"
             >
               <ArrowRightLeft className="w-3 h-3 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">ØªØ­ÙˆÙŠÙ„ Ø¹Ù…Ù„Ø©</span>
+              <span className="hidden sm:inline">تحويل عملة</span>
             </button>
           </div>
         }
@@ -293,37 +293,37 @@ const Dashboard = () => {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4">
           <StatCard
-            title="Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø¥ÙŠØ±Ø§Ø¯Ø§Øª"
+            title="إجمالي الإيرادات"
             value={selectedCurrency === 'all' ? '-' : formatCurrency(totalRevenue)}
             icon={DollarSign}
             variant="primary"
           />
           <StatCard
-            title="ØµØ§ÙÙŠ Ø§Ù„Ø±Ø¨Ø­"
+            title="صافي الربح"
             value={selectedCurrency === 'all' ? '-' : formatCurrency(netProfit)}
             icon={TrendingUp}
             variant="success"
           />
           <StatCard
-            title="Ø§Ù„Ø§Ø´ØªØ±Ø§ÙƒØ§Øª Ø§Ù„Ù†Ø´Ø·Ø©"
+            title="الاشتراكات النشطة"
             value={activeSubscriptions.toString()}
             icon={CreditCard}
             variant="default"
           />
           <StatCard
-            title="Ù‚Ø±ÙŠØ¨Ø© Ù…Ù† Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡"
+            title="قريبة من الانتهاء"
             value={expiringSoon.toString()}
             icon={AlertTriangle}
             variant="warning"
           />
           <StatCard
-            title="Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø®Ø¯Ù…Ø§Øª"
+            title="إجمالي الخدمات"
             value={totalServices.toString()}
             icon={Package}
             variant="default"
           />
           <StatCard
-            title="Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡"
+            title="العملاء"
             value={`${activeCustomers}/${totalCustomers}`}
             icon={Users}
             variant="default"
@@ -349,29 +349,29 @@ const Dashboard = () => {
                   </div>
                   {/* Current Balance - Highlighted */}
                   <div className="mb-2 md:mb-3 p-2 md:p-3 rounded-lg bg-success/10 border border-success/30">
-                    <span className="text-xs md:text-sm text-success">Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„ÙØ¹Ù„ÙŠ:</span>
+                    <span className="text-xs md:text-sm text-success">الرصيد الفعلي:</span>
                     <p className="text-base md:text-xl font-bold text-success">
-                      {new Intl.NumberFormat('ar-SA-u-ca-gregory').format(balance)} {currency.symbol}
+                      {new Intl.NumberFormat('ar-SA').format(balance)} {currency.symbol}
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm">
                     <div>
-                      <span className="text-muted-foreground">Ø§Ù„Ø¥ÙŠØ±Ø§Ø¯Ø§Øª:</span>
-                      <p className="font-bold text-foreground">{new Intl.NumberFormat('ar-SA-u-ca-gregory').format(stats.revenue)}</p>
+                      <span className="text-muted-foreground">الإيرادات:</span>
+                      <p className="font-bold text-foreground">{new Intl.NumberFormat('ar-SA').format(stats.revenue)}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª:</span>
-                      <p className="font-bold text-destructive">{new Intl.NumberFormat('ar-SA-u-ca-gregory').format(stats.expenses)}</p>
+                      <span className="text-muted-foreground">المصروفات:</span>
+                      <p className="font-bold text-destructive">{new Intl.NumberFormat('ar-SA').format(stats.expenses)}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">ØµØ§ÙÙŠ Ø§Ù„Ø±Ø¨Ø­:</span>
+                      <span className="text-muted-foreground">صافي الربح:</span>
                       <p className={`font-bold ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {new Intl.NumberFormat('ar-SA-u-ca-gregory').format(profit)}
+                        {new Intl.NumberFormat('ar-SA').format(profit)}
                       </p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Ø§Ù„Ù…Ø¯ÙŠÙˆÙ†ÙŠØ©:</span>
-                      <p className="font-bold text-warning">{new Intl.NumberFormat('ar-SA-u-ca-gregory').format(stats.debt)}</p>
+                      <span className="text-muted-foreground">المديونية:</span>
+                      <p className="font-bold text-warning">{new Intl.NumberFormat('ar-SA').format(stats.debt)}</p>
                     </div>
                   </div>
                 </div>
@@ -385,21 +385,21 @@ const Dashboard = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
             <div className="bg-card rounded-xl p-3 md:p-4 border border-border">
               <div className="flex items-center justify-between mb-1 md:mb-2">
-                <span className="text-xs md:text-sm text-muted-foreground">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ØªÙƒØ§Ù„ÙŠÙ</span>
+                <span className="text-xs md:text-sm text-muted-foreground">إجمالي التكاليف</span>
                 <DollarSign className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground" />
               </div>
               <p className="text-base md:text-xl font-bold text-foreground">{formatCurrency(totalCost)}</p>
             </div>
             <div className="bg-card rounded-xl p-3 md:p-4 border border-border">
               <div className="flex items-center justify-between mb-1 md:mb-2">
-                <span className="text-xs md:text-sm text-muted-foreground">Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª</span>
+                <span className="text-xs md:text-sm text-muted-foreground">المصروفات</span>
                 <Wallet className="w-3 h-3 md:w-4 md:h-4 text-destructive" />
               </div>
               <p className="text-base md:text-xl font-bold text-destructive">{formatCurrency(totalExpenses)}</p>
             </div>
             <div className="bg-card rounded-xl p-3 md:p-4 border border-border">
               <div className="flex items-center justify-between mb-1 md:mb-2">
-                <span className="text-xs md:text-sm text-muted-foreground">Ù‡Ø§Ù…Ø´ Ø§Ù„Ø±Ø¨Ø­</span>
+                <span className="text-xs md:text-sm text-muted-foreground">هامش الربح</span>
                 <TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-success" />
               </div>
               <p className="text-base md:text-xl font-bold text-success">
@@ -408,7 +408,7 @@ const Dashboard = () => {
             </div>
             <div className={`bg-card rounded-xl p-3 md:p-4 border ${totalDebt > 0 ? 'border-destructive/30 bg-destructive/5' : 'border-border'}`}>
               <div className="flex items-center justify-between mb-1 md:mb-2">
-                <span className="text-xs md:text-sm text-muted-foreground">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¯ÙŠÙˆÙ†ÙŠØ©</span>
+                <span className="text-xs md:text-sm text-muted-foreground">إجمالي المديونية</span>
                 <AlertCircle className={`w-3 h-3 md:w-4 md:h-4 ${totalDebt > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
               </div>
               <p className={`text-base md:text-xl font-bold ${totalDebt > 0 ? 'text-destructive' : 'text-foreground'}`}>
@@ -416,7 +416,7 @@ const Dashboard = () => {
               </p>
               {deferredCount > 0 && (
                 <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
-                  Ù…Ù† {deferredCount} Ø§Ø´ØªØ±Ø§Ùƒ
+                  من {deferredCount} اشتراك
                 </p>
               )}
             </div>
@@ -429,7 +429,7 @@ const Dashboard = () => {
           <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 md:p-4">
             <div className="flex items-center gap-2 mb-2 md:mb-3">
               <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-destructive" />
-              <h3 className="font-semibold text-destructive text-sm md:text-base">ØªÙ†Ø¨ÙŠÙ‡: Ø¯ÙØ¹Ø§Øª Ù…ØªØ£Ø®Ø±Ø© Ø§Ù„Ø³Ø¯Ø§Ø¯</h3>
+              <h3 className="font-semibold text-destructive text-sm md:text-base">تنبيه: دفعات متأخرة السداد</h3>
             </div>
             <div className="space-y-2">
               {overduePayments.slice(0, 5).map((sub) => {
@@ -446,14 +446,14 @@ const Dashboard = () => {
                       <div>
                         <p className="font-medium text-foreground text-xs md:text-sm">{sub.customerName}</p>
                         <p className="text-[10px] md:text-xs text-muted-foreground">
-                          Ù…ØªØ£Ø®Ø± {daysOverdue} ÙŠÙˆÙ…
+                          متأخر {daysOverdue} يوم
                         </p>
                       </div>
                     </div>
                     <div className="text-left">
                       <p className="font-bold text-destructive text-xs md:text-sm">{formatCurrency(remaining, sub.currency)}</p>
                       <p className="text-[10px] md:text-xs text-muted-foreground">
-                        ÙƒØ§Ù† Ù…ÙˆØ¹Ø¯Ù‡: {sub.dueDate?.toLocaleDateString('ar-SA-u-ca-gregory')}
+                        كان موعده: {sub.dueDate?.toLocaleDateString('ar-SA')}
                       </p>
                     </div>
                   </div>
@@ -461,7 +461,7 @@ const Dashboard = () => {
               })}
               {overduePayments.length > 5 && (
                 <p className="text-xs md:text-sm text-center text-muted-foreground">
-                  Ùˆ {overduePayments.length - 5} Ø¯ÙØ¹Ø§Øª Ø£Ø®Ø±Ù‰...
+                  و {overduePayments.length - 5} دفعات أخرى...
                 </p>
               )}
             </div>
@@ -507,4 +507,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

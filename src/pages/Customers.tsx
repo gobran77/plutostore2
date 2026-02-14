@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Header } from '@/components/layout/Header';
@@ -123,7 +123,7 @@ const Customers = () => {
       updateCachedCustomers(customerData);
     } catch (err) {
       console.error('Error fetching customers:', err);
-      toast.error('Ø­Ø¯Ø« Ø®Ø·Ø£ ÙÙŠ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡');
+      toast.error('حدث خطأ في تحميل العملاء');
     } finally {
       setIsLoading(false);
     }
@@ -190,11 +190,11 @@ const Customers = () => {
       removeFromArrayStorage('app_invoices', (inv) => String(inv?.customerId || '') === String(selectedCustomer.id));
       removeFromArrayStorage('app_payments', (pay) => String(pay?.customerId || '') === String(selectedCustomer.id));
 
-      toast.success('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¨Ù†Ø¬Ø§Ø­');
+      toast.success('تم حذف العميل بنجاح');
       setSelectedCustomer(null);
     } catch (err) {
       console.error('Error deleting customer:', err);
-      toast.error('Ø­Ø¯Ø« Ø®Ø·Ø£ ÙÙŠ Ø­Ø°Ù Ø§Ù„Ø¹Ù…ÙŠÙ„');
+      toast.error('حدث خطأ في حذف العميل');
       fetchCustomers(); // Reload to restore correct state
     }
   };
@@ -215,10 +215,10 @@ const Customers = () => {
           c.id === customer.id ? { ...c, status: newStatus, is_activated: newStatus === 'active' } : c
         )
       );
-      toast.success(`ØªÙ… ØªØ­Ø¯ÙŠØ« Ø­Ø§Ù„Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„`);
+      toast.success(`تم تحديث حالة العميل`);
     } catch (err) {
       console.error('Error updating customer status:', err);
-      toast.error('Ø­Ø¯Ø« Ø®Ø·Ø£ ÙÙŠ ØªØ­Ø¯ÙŠØ« Ø­Ø§Ù„Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„');
+      toast.error('حدث خطأ في تحديث حالة العميل');
     }
   };
 
@@ -259,32 +259,32 @@ const Customers = () => {
       setCustomers(next);
       updateCachedCustomers(next);
 
-      toast.success('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¨Ù†Ø¬Ø§Ø­');
+      toast.success('تم تحديث بيانات العميل بنجاح');
     } catch (err) {
       console.error('Error updating customer:', err);
-      toast.error('Ø­Ø¯Ø« Ø®Ø·Ø£ ÙÙŠ ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„');
+      toast.error('حدث خطأ في تحديث بيانات العميل');
     }
   };
 
   const copyActivationCode = (code: string, customerId: string) => {
     navigator.clipboard.writeText(code);
     setCopiedId(customerId);
-    toast.success('ØªÙ… Ù†Ø³Ø® ÙƒÙˆØ¯ Ø§Ù„ØªÙØ¹ÙŠÙ„');
+    toast.success('تم نسخ كود التفعيل');
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   const sendActivationCodeWhatsApp = (customer: CustomerAccount) => {
     if (!customer.activation_code) {
-      toast.error('Ù„Ø§ ÙŠÙˆØ¬Ø¯ ÙƒÙˆØ¯ ØªÙØ¹ÙŠÙ„');
+      toast.error('لا يوجد كود تفعيل');
       return;
     }
 
     const message = encodeURIComponent(
-      `Ù…Ø±Ø­Ø¨Ø§Ù‹ ${customer.name}ØŒ\n\n` +
-      `ÙƒÙˆØ¯ ØªÙØ¹ÙŠÙ„ Ø­Ø³Ø§Ø¨Ùƒ ÙÙŠ Ø¨Ù„ÙˆØªÙˆ Ø³ØªÙˆØ± AI:\n\n` +
-      `ðŸ”‘ Ø§Ù„ÙƒÙˆØ¯: ${customer.activation_code}\n\n` +
-      `Ø±Ø§Ø¨Ø· Ø§Ù„ØªÙØ¹ÙŠÙ„: ${window.location.origin}/customer/activate\n\n` +
-      `Ø¨Ø¹Ø¯ Ø§Ù„ØªÙØ¹ÙŠÙ„ ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ù…Ù†:\n` +
+      `مرحباً ${customer.name}،\n\n` +
+      `كود تفعيل حسابك في بلوتو ستور AI:\n\n` +
+      `🔑 الكود: ${customer.activation_code}\n\n` +
+      `رابط التفعيل: ${window.location.origin}/customer/activate\n\n` +
+      `بعد التفعيل يمكنك الدخول من:\n` +
       `${window.location.origin}/customer`
     );
     
@@ -304,10 +304,10 @@ const Customers = () => {
       );
       setCustomers(next);
       updateCachedCustomers(next);
-      toast.success('ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø­Ø³Ø§Ø¨ Ø¨Ù†Ø¬Ø§Ø­');
+      toast.success('تم تفعيل الحساب بنجاح');
     } catch (err) {
       console.error('Error activating customer:', err);
-      toast.error('Ø­Ø¯Ø« Ø®Ø·Ø£ ÙÙŠ ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø­Ø³Ø§Ø¨');
+      toast.error('حدث خطأ في تفعيل الحساب');
     }
   };
 
@@ -344,7 +344,7 @@ const Customers = () => {
   const columns = [
     {
       key: 'name',
-      header: 'Ø§Ù„Ø¹Ù…ÙŠÙ„',
+      header: 'العميل',
       render: (customer: CustomerAccount) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
@@ -364,7 +364,7 @@ const Customers = () => {
     },
     {
       key: 'balance',
-      header: 'Ø§Ù„Ø£Ø±ØµØ¯Ø©',
+      header: 'الأرصدة',
       render: (customer: CustomerAccount) => (
         <button 
           onClick={() => openBalanceModal(customer)}
@@ -386,19 +386,19 @@ const Customers = () => {
     },
     {
       key: 'status',
-      header: 'Ø§Ù„Ø­Ø§Ù„Ø©',
+      header: 'الحالة',
       render: (customer: CustomerAccount) => (
         <div className="flex flex-col gap-1">
           <StatusBadge status={customer.status} />
           {!customer.is_activated && (
-            <span className="text-xs text-warning">ØºÙŠØ± Ù…ÙØ¹Ù„</span>
+            <span className="text-xs text-warning">غير مفعل</span>
           )}
         </div>
       ),
     },
     {
       key: 'activation_code',
-      header: 'ÙƒÙˆØ¯ Ø§Ù„ØªÙØ¹ÙŠÙ„',
+      header: 'كود التفعيل',
       render: (customer: CustomerAccount) => (
         <div className="flex items-center gap-2">
           {customer.activation_code ? (
@@ -420,7 +420,7 @@ const Customers = () => {
                 <button
                   onClick={() => sendActivationCodeWhatsApp(customer)}
                   className="p-1 hover:bg-success/10 rounded text-success"
-                  title="Ø¥Ø±Ø³Ø§Ù„ Ø¹Ø¨Ø± ÙˆØ§ØªØ³Ø§Ø¨"
+                  title="إرسال عبر واتساب"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -434,10 +434,10 @@ const Customers = () => {
     },
     {
       key: 'createdAt',
-      header: 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡',
+      header: 'تاريخ الإنشاء',
       render: (customer: CustomerAccount) => (
         <span className="text-muted-foreground text-sm">
-          {new Date(customer.created_at).toLocaleDateString('ar-SA-u-ca-gregory')}
+          {new Date(customer.created_at).toLocaleDateString('ar-SA')}
         </span>
       ),
     },
@@ -448,49 +448,49 @@ const Customers = () => {
         <ActionsMenu
           items={[
             {
-              label: 'Ø§Ù„Ø¯Ø®ÙˆÙ„ Ù„Ù„Ø­Ø³Ø§Ø¨',
+              label: 'الدخول للحساب',
               icon: ExternalLink,
               onClick: () => viewAsCustomer(customer),
             },
             {
-              label: 'ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª',
+              label: 'تعديل البيانات',
               icon: Edit,
               onClick: () => openEditModal(customer),
             },
             {
-              label: 'ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø±ØµÙŠØ¯',
+              label: 'تعديل الرصيد',
               icon: Wallet,
               onClick: () => openBalanceModal(customer),
             },
             ...(!customer.is_activated ? [{
-              label: 'ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø­Ø³Ø§Ø¨',
+              label: 'تفعيل الحساب',
               icon: Key,
               onClick: () => activateCustomer(customer),
             }] : []),
             ...(customer.activation_code && !customer.is_activated ? [{
-              label: 'Ø¥Ø±Ø³Ø§Ù„ ÙƒÙˆØ¯ Ø§Ù„ØªÙØ¹ÙŠÙ„',
+              label: 'إرسال كود التفعيل',
               icon: MessageCircle,
               onClick: () => sendActivationCodeWhatsApp(customer),
             }] : []),
             // Status change actions
             ...(customer.status !== 'active' ? [{
-              label: 'ØªÙ†Ø´ÙŠØ· Ø§Ù„Ø¹Ù…ÙŠÙ„',
+              label: 'تنشيط العميل',
               icon: UserCheck,
               onClick: () => updateCustomerStatus(customer, 'active'),
             }] : []),
             ...(customer.status !== 'inactive' ? [{
-              label: 'Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„Ø¹Ù…ÙŠÙ„',
+              label: 'إيقاف العميل',
               icon: UserX,
               onClick: () => updateCustomerStatus(customer, 'inactive'),
             }] : []),
             ...(customer.status !== 'blocked' ? [{
-              label: 'Ø­Ø¸Ø± Ø§Ù„Ø¹Ù…ÙŠÙ„',
+              label: 'حظر العميل',
               icon: Ban,
               onClick: () => updateCustomerStatus(customer, 'blocked'),
               variant: 'danger' as const,
             }] : []),
             {
-              label: 'Ø­Ø°Ù',
+              label: 'حذف',
               icon: Trash2,
               onClick: () => openDeleteModal(customer),
               variant: 'danger' as const,
@@ -505,10 +505,10 @@ const Customers = () => {
   return (
     <MainLayout>
       <Header
-        title="Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡"
-        subtitle={`${customers.length} Ø¹Ù…ÙŠÙ„ Ù…Ø³Ø¬Ù„`}
+        title="العملاء"
+        subtitle={`${customers.length} عميل مسجل`}
         showAddButton
-        addButtonLabel="Ø¥Ø¶Ø§ÙØ© Ø¹Ù…ÙŠÙ„"
+        addButtonLabel="إضافة عميل"
         onAddClick={() => setIsAddModalOpen(true)}
       />
 
@@ -517,11 +517,11 @@ const Customers = () => {
         <div className="flex items-center gap-3 flex-wrap">
           <button className="btn-secondary">
             <Filter className="w-4 h-4" />
-            ØªØµÙÙŠØ©
+            تصفية
           </button>
           <button className="btn-ghost">
             <Download className="w-4 h-4" />
-            ØªØµØ¯ÙŠØ± CSV
+            تصدير CSV
           </button>
         </div>
 
@@ -529,28 +529,28 @@ const Customers = () => {
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-4">
             <TabsTrigger value="all" className="flex items-center gap-2">
-              Ø§Ù„ÙƒÙ„
+              الكل
               <span className="px-2 py-0.5 text-xs rounded-full bg-muted">
                 {statusCounts.all}
               </span>
             </TabsTrigger>
             <TabsTrigger value="active" className="flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-success" />
-              Ù†Ø´Ø·
+              نشط
               <span className="px-2 py-0.5 text-xs rounded-full bg-success/20 text-success">
                 {statusCounts.active}
               </span>
             </TabsTrigger>
             <TabsTrigger value="inactive" className="flex items-center gap-2">
               <UserX className="w-4 h-4 text-warning" />
-              Ù…ÙˆÙ‚ÙˆÙ
+              موقوف
               <span className="px-2 py-0.5 text-xs rounded-full bg-warning/20 text-warning">
                 {statusCounts.inactive}
               </span>
             </TabsTrigger>
             <TabsTrigger value="blocked" className="flex items-center gap-2">
               <Ban className="w-4 h-4 text-destructive" />
-              Ù…Ø­Ø¸ÙˆØ±
+              محظور
               <span className="px-2 py-0.5 text-xs rounded-full bg-destructive/20 text-destructive">
                 {statusCounts.blocked}
               </span>
@@ -561,7 +561,7 @@ const Customers = () => {
         {/* Info Box */}
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
           <p className="text-sm text-foreground">
-            ðŸ’¡ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ ÙŠØ³Ø¬Ù„ÙˆÙ† Ù…Ù† ØµÙØ­Ø© <code className="px-1 bg-muted rounded">/customer/register</code> ÙˆÙŠØ­ØµÙ„ÙˆÙ† Ø¹Ù„Ù‰ ÙƒÙˆØ¯ ØªÙØ¹ÙŠÙ„. Ø£Ø±Ø³Ù„ Ø§Ù„ÙƒÙˆØ¯ Ø¹Ø¨Ø± ÙˆØ§ØªØ³Ø§Ø¨ Ù„ØªÙØ¹ÙŠÙ„ Ø­Ø³Ø§Ø¨Ø§ØªÙ‡Ù….
+            💡 العملاء يسجلون من صفحة <code className="px-1 bg-muted rounded">/customer/register</code> ويحصلون على كود تفعيل. أرسل الكود عبر واتساب لتفعيل حساباتهم.
           </p>
         </div>
 
@@ -577,12 +577,12 @@ const Customers = () => {
             keyExtractor={(customer) => customer.id}
             emptyMessage={
               activeTab === 'all' 
-                ? 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø¹Ù…Ù„Ø§Ø¡ Ù…Ø³Ø¬Ù„ÙŠÙ†' 
+                ? 'لا يوجد عملاء مسجلين' 
                 : activeTab === 'active'
-                ? 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø¹Ù…Ù„Ø§Ø¡ Ù†Ø´Ø·ÙŠÙ†'
+                ? 'لا يوجد عملاء نشطين'
                 : activeTab === 'inactive'
-                ? 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø¹Ù…Ù„Ø§Ø¡ Ù…ÙˆÙ‚ÙˆÙÙŠÙ†'
-                : 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø¹Ù…Ù„Ø§Ø¡ Ù…Ø­Ø¸ÙˆØ±ÙŠÙ†'
+                ? 'لا يوجد عملاء موقوفين'
+                : 'لا يوجد عملاء محظورين'
             }
           />
         )}
@@ -609,8 +609,8 @@ const Customers = () => {
       {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={isDeleteModalOpen}
-        title="Ø­Ø°Ù Ø§Ù„Ø¹Ù…ÙŠÙ„"
-        message="Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ù‡Ø°Ø§ Ø§Ù„Ø¹Ù…ÙŠÙ„ØŸ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡."
+        title="حذف العميل"
+        message="هل أنت متأكد من حذف هذا العميل؟ لا يمكن التراجع عن هذا الإجراء."
         itemName={selectedCustomer?.name}
         onClose={() => {
           setIsDeleteModalOpen(false);
@@ -634,4 +634,3 @@ const Customers = () => {
 };
 
 export default Customers;
-

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ArrowRight, Calculator, Divide, AlertCircle } from 'lucide-react';
 import { supportedCurrencies, getCurrencySymbol, getCurrencyName, CurrencyExchange, loadCurrencyBalances, processCurrencyExchange } from '@/types/currency';
 
@@ -40,7 +40,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
     const exchangeResult = processCurrencyExchange(fromCurrency, toCurrency, amountNum, result);
     
     if (!exchangeResult.success) {
-      setError(exchangeResult.error || 'ÙØ´Ù„ ÙÙŠ Ø¹Ù…Ù„ÙŠØ© Ø§Ù„ØªØ­ÙˆÙŠÙ„');
+      setError(exchangeResult.error || 'فشل في عملية التحويل');
       return;
     }
     
@@ -82,7 +82,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
       />
       <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in border border-border">
         <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-bold text-foreground">ØªØ­ÙˆÙŠÙ„ Ø§Ù„Ø¹Ù…Ù„Ø§Øª</h2>
+          <h2 className="text-xl font-bold text-foreground">تحويل العملات</h2>
           <button 
             onClick={handleClose} 
             className="p-2 rounded-lg hover:bg-muted transition-colors"
@@ -99,7 +99,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
               }`}>
                 <p className="text-xs text-muted-foreground">{c.name}</p>
                 <p className="font-bold text-foreground">
-                  {new Intl.NumberFormat('ar-SA-u-ca-gregory').format(balances[c.code] || 0)} {c.symbol}
+                  {new Intl.NumberFormat('ar-SA').format(balances[c.code] || 0)} {c.symbol}
                 </p>
               </div>
             ))}
@@ -116,7 +116,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
           {/* Currency Selection */}
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-foreground mb-2">Ù…Ù†</label>
+              <label className="block text-sm font-medium text-foreground mb-2">من</label>
               <select
                 value={fromCurrency}
                 onChange={(e) => {
@@ -132,7 +132,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
                 ))}
               </select>
               <p className="text-xs text-muted-foreground mt-1">
-                Ø§Ù„Ø±ØµÙŠØ¯: {new Intl.NumberFormat('ar-SA-u-ca-gregory').format(balances[fromCurrency] || 0)}
+                الرصيد: {new Intl.NumberFormat('ar-SA').format(balances[fromCurrency] || 0)}
               </p>
             </div>
             <button
@@ -142,7 +142,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
               <ArrowRight className="w-5 h-5" />
             </button>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-foreground mb-2">Ø¥Ù„Ù‰</label>
+              <label className="block text-sm font-medium text-foreground mb-2">إلى</label>
               <select
                 value={toCurrency}
                 onChange={(e) => setToCurrency(e.target.value)}
@@ -155,7 +155,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
                 ))}
               </select>
               <p className="text-xs text-muted-foreground mt-1">
-                Ø§Ù„Ø±ØµÙŠØ¯: {new Intl.NumberFormat('ar-SA-u-ca-gregory').format(balances[toCurrency] || 0)}
+                الرصيد: {new Intl.NumberFormat('ar-SA').format(balances[toCurrency] || 0)}
               </p>
             </div>
           </div>
@@ -164,11 +164,11 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-foreground">
-                Ø§Ù„Ù…Ø¨Ù„Øº <span className="text-destructive">*</span>
+                المبلغ <span className="text-destructive">*</span>
               </label>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">
-                  Ø§Ù„Ù…ØªØ§Ø­: <span className="font-bold text-foreground">{new Intl.NumberFormat('ar-SA-u-ca-gregory').format(balances[fromCurrency] || 0)}</span> {getCurrencySymbol(fromCurrency)}
+                  المتاح: <span className="font-bold text-foreground">{new Intl.NumberFormat('ar-SA').format(balances[fromCurrency] || 0)}</span> {getCurrencySymbol(fromCurrency)}
                 </span>
                 <button
                   type="button"
@@ -176,7 +176,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
                   disabled={!balances[fromCurrency] || balances[fromCurrency] <= 0}
                   className="px-2 py-1 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Ø§Ù„ÙƒÙ„
+                  الكل
                 </button>
               </div>
             </div>
@@ -185,7 +185,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="Ø£Ø¯Ø®Ù„ Ø§Ù„Ù…Ø¨Ù„Øº"
+                placeholder="أدخل المبلغ"
                 className="input-field pl-12"
                 min="0"
                 max={balances[fromCurrency] || 0}
@@ -197,7 +197,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
             </div>
             {amount && parseFloat(amount) > (balances[fromCurrency] || 0) && (
               <p className="text-xs text-destructive mt-1">
-                Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯Ø®Ù„ Ø£ÙƒØ¨Ø± Ù…Ù† Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ù…ØªØ§Ø­!
+                المبلغ المدخل أكبر من الرصيد المتاح!
               </p>
             )}
           </div>
@@ -205,7 +205,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
           {/* Operation Selection */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Ù†ÙˆØ¹ Ø§Ù„Ø¹Ù…Ù„ÙŠØ©
+              نوع العملية
             </label>
             <div className="flex items-center gap-2">
               <button
@@ -217,8 +217,8 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
                     : 'border-border bg-card text-muted-foreground hover:border-muted-foreground'
                 }`}
               >
-                <span className="text-lg font-bold">Ã—</span>
-                <span className="font-medium">Ø¶Ø±Ø¨</span>
+                <span className="text-lg font-bold">×</span>
+                <span className="font-medium">ضرب</span>
               </button>
               <button
                 type="button"
@@ -230,7 +230,7 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
                 }`}
               >
                 <Divide className="w-5 h-5" />
-                <span className="font-medium">Ù‚Ø³Ù…Ø©</span>
+                <span className="font-medium">قسمة</span>
               </button>
             </div>
           </div>
@@ -238,13 +238,13 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
           {/* Exchange Rate */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Ø³Ø¹Ø± Ø§Ù„ØµØ±Ù <span className="text-destructive">*</span>
+              سعر الصرف <span className="text-destructive">*</span>
             </label>
             <input
               type="number"
               value={rate}
               onChange={(e) => setRate(e.target.value)}
-              placeholder={`1 ${getCurrencySymbol(fromCurrency)} = ØŸ ${getCurrencySymbol(toCurrency)}`}
+              placeholder={`1 ${getCurrencySymbol(fromCurrency)} = ؟ ${getCurrencySymbol(toCurrency)}`}
               className="input-field"
               min="0"
               step="0.0001"
@@ -256,13 +256,13 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
             <div className="bg-success/10 border border-success/30 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Calculator className="w-5 h-5 text-success" />
-                <span className="text-sm font-medium text-success">Ø§Ù„Ù†Ø§ØªØ¬</span>
+                <span className="text-sm font-medium text-success">الناتج</span>
               </div>
               <p className="text-2xl font-bold text-foreground">
-                {new Intl.NumberFormat('ar-SA-u-ca-gregory', { maximumFractionDigits: 2 }).format(result)} {getCurrencySymbol(toCurrency)}
+                {new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 2 }).format(result)} {getCurrencySymbol(toCurrency)}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                {amount} {getCurrencySymbol(fromCurrency)} {operation === 'multiply' ? 'Ã—' : 'Ã·'} {rate} = {result.toFixed(2)} {getCurrencySymbol(toCurrency)}
+                {amount} {getCurrencySymbol(fromCurrency)} {operation === 'multiply' ? '×' : '÷'} {rate} = {result.toFixed(2)} {getCurrencySymbol(toCurrency)}
               </p>
             </div>
           )}
@@ -273,10 +273,10 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
               className="btn-primary flex-1"
               disabled={!amount || !rate}
             >
-              ØªØ£ÙƒÙŠØ¯ Ø§Ù„ØªØ­ÙˆÙŠÙ„
+              تأكيد التحويل
             </button>
             <button onClick={handleClose} className="btn-secondary">
-              Ø¥Ù„ØºØ§Ø¡
+              إلغاء
             </button>
           </div>
         </div>
@@ -284,4 +284,3 @@ export const CurrencyExchangeModal = ({ isOpen, onClose, onExchange }: CurrencyE
     </div>
   );
 };
-
