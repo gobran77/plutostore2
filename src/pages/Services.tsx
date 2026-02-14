@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { db, firebaseProjectId } from '@/integrations/firebase/client';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
 
 // Storage key for services
 const SERVICES_STORAGE_KEY = 'app_services';
@@ -89,6 +89,16 @@ const Services = () => {
     );
 
     const loadServices = async () => {
+      const getLocalServices = (): Service[] => {
+        const saved = localStorage.getItem(SERVICES_STORAGE_KEY);
+        if (!saved) return [];
+        try {
+          return normalizeServices(JSON.parse(saved));
+        } catch {
+          return [];
+        }
+      };
+
       try {
         if (db) {
           const snapshot = await getDocs(collection(db, 'service_catalog_items'));
@@ -99,8 +109,19 @@ const Services = () => {
 
           if (fromFirestore.length > 0) {
             const normalized = normalizeServices(fromFirestore);
-            setServices(normalized);
-            localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(normalized));
+            const localServices = getLocalServices();
+            const localById = new Map(localServices.map((s) => [String(s.id), s]));
+
+            // Keep local accounts/emails when Firestore document doesn't include them.
+            const merged = normalized.map((service) => {
+              const local = localById.get(String(service.id));
+              if (!local) return service;
+              const hasCloudAccounts = Array.isArray(service.accounts) && service.accounts.length > 0;
+              return hasCloudAccounts ? service : { ...service, accounts: local.accounts || [] };
+            });
+
+            setServices(merged);
+            localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(merged));
             return;
           }
 
@@ -174,7 +195,69 @@ const Services = () => {
   useEffect(() => {
     if (services.length > 0) {
       localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(services));
+    } else {
+      localStorage.removeItem(SERVICES_STORAGE_KEY);
     }
+  }, [services]);
+
+  // Persist legacy services to Firestore collection used for manual services.
+  useEffect(() => {
+    if (!db) return;
+
+    const toIso = (value: any) =>
+      value instanceof Date ? value.toISOString() : new Date(value || Date.now()).toISOString();
+
+    const serialize = (service: Service) => ({
+      ...service,
+      createdAt: toIso(service.createdAt),
+      accounts: Array.isArray(service.accounts)
+        ? service.accounts.map((a) => ({
+            ...a,
+            createdAt: toIso(a.createdAt),
+            sharedEmails: Array.isArray(a.sharedEmails)
+              ? a.sharedEmails.map((e) => ({
+                  ...e,
+                  addedAt: toIso(e.addedAt),
+                  users: Array.isArray(e.users)
+                    ? e.users.map((u) => ({ ...u, linkedAt: toIso(u.linkedAt) }))
+                    : [],
+                }))
+              : [],
+          }))
+        : [],
+    });
+
+    let cancelled = false;
+    const syncServices = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'service_catalog_items'));
+        if (cancelled) return;
+
+        const nextIds = new Set(services.map((s) => String(s.id)));
+        await Promise.all(
+          services.map((service) =>
+            setDoc(doc(db, 'service_catalog_items', String(service.id)), serialize(service), { merge: true })
+          )
+        );
+
+        const deletes: Promise<void>[] = [];
+        snapshot.docs.forEach((d) => {
+          if (!nextIds.has(d.id)) {
+            deletes.push(deleteDoc(doc(db, 'service_catalog_items', d.id)));
+          }
+        });
+        if (deletes.length > 0) {
+          await Promise.all(deletes);
+        }
+      } catch (error) {
+        console.error('Failed to sync services to Firestore:', error);
+      }
+    };
+
+    void syncServices();
+    return () => {
+      cancelled = true;
+    };
   }, [services]);
 
   // Save dynamic services to localStorage
