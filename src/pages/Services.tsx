@@ -16,6 +16,8 @@ import { getCurrencySymbol } from '@/types/currency';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { db } from '@/integrations/firebase/client';
+import { collection, getDocs } from 'firebase/firestore';
 
 // Storage key for services
 const SERVICES_STORAGE_KEY = 'app_services';
@@ -55,33 +57,68 @@ const Services = () => {
   const [emailForm, setEmailForm] = useState({ email: '', password: '' });
   const [editEmailForm, setEditEmailForm] = useState({ email: '', password: '' });
 
-  // Load data from localStorage on mount
+  // Load data on mount (Firestore first, then local fallback)
   useEffect(() => {
-    const savedServices = localStorage.getItem(SERVICES_STORAGE_KEY);
-    if (savedServices) {
+    const normalizeServices = (input: any[]): Service[] => (
+      input.map((s: any) => ({
+        ...s,
+        id: String(s?.id || ''),
+        name: String(s?.name || ''),
+        defaultType: (s?.defaultType === 'private' ? 'private' : 'shared') as ServiceType,
+        pricing: Array.isArray(s?.pricing) ? s.pricing : [],
+        createdAt: new Date(s?.createdAt || s?.created_at || Date.now()),
+        accounts: Array.isArray(s?.accounts)
+          ? s.accounts.map((a: any) => ({
+              ...a,
+              createdAt: new Date(a?.createdAt || a?.created_at || Date.now()),
+              sharedEmails: Array.isArray(a?.sharedEmails)
+                ? a.sharedEmails.map((e: any) => ({
+                    ...e,
+                    addedAt: new Date(e?.addedAt || e?.added_at || Date.now()),
+                    users: Array.isArray(e?.users)
+                      ? e.users.map((u: any) => ({
+                          ...u,
+                          linkedAt: new Date(u?.linkedAt || u?.linked_at || Date.now()),
+                        }))
+                      : [],
+                  }))
+                : [],
+            }))
+          : [],
+      }))
+    );
+
+    const loadServices = async () => {
+      try {
+        if (db) {
+          const snapshot = await getDocs(collection(db, 'service_catalog_items'));
+          const fromFirestore = snapshot.docs.map((d) => {
+            const row = d.data() as any;
+            return { ...row, id: String(row?.id || d.id) };
+          });
+
+          if (fromFirestore.length > 0) {
+            const normalized = normalizeServices(fromFirestore);
+            setServices(normalized);
+            localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(normalized));
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Error loading services from Firestore:', e);
+      }
+
+      const savedServices = localStorage.getItem(SERVICES_STORAGE_KEY);
+      if (!savedServices) return;
       try {
         const parsed = JSON.parse(savedServices);
-        const servicesWithDates = parsed.map((s: any) => ({
-          ...s,
-          createdAt: new Date(s.createdAt),
-          accounts: s.accounts.map((a: any) => ({
-            ...a,
-            createdAt: new Date(a.createdAt),
-            sharedEmails: a.sharedEmails.map((e: any) => ({
-              ...e,
-              addedAt: new Date(e.addedAt),
-              users: e.users.map((u: any) => ({
-                ...u,
-                linkedAt: new Date(u.linkedAt),
-              })),
-            })),
-          })),
-        }));
-        setServices(servicesWithDates);
+        setServices(normalizeServices(parsed));
       } catch (e) {
-        console.error('Error loading services:', e);
+        console.error('Error loading services from localStorage:', e);
       }
-    }
+    };
+
+    void loadServices();
 
     // Load dynamic services
     const savedDynamicServices = localStorage.getItem(DYNAMIC_SERVICES_KEY);
