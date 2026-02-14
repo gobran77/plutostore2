@@ -6,15 +6,6 @@ import path from "path";
 export default defineConfig(async ({ mode }) => {
   const plugins = [react()];
 
-  if (mode === "development") {
-    try {
-      const { componentTagger } = await import("lovable-tagger");
-      plugins.push(componentTagger());
-    } catch {
-      // Keep dev server working even if optional dev tooling is unavailable.
-    }
-  }
-
   return {
     // GitHub Pages serves from /<repo>/, so we need a different base path there.
     base: mode === "github" ? "/plutostore/" : "/",
