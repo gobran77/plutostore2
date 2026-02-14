@@ -102,6 +102,11 @@ export const savePayments = (payments: Payment[]): void => {
   localStorage.setItem(PAYMENTS_STORAGE_KEY, JSON.stringify(payments));
 };
 
+export const hydrateInvoicePaymentStorageFromCloud = async (): Promise<void> => {
+  // Manual storage mode: no automatic cloud hydration.
+  return Promise.resolve();
+};
+
 // Add new invoice
 export const addInvoice = (invoice: Invoice): void => {
   const invoices = loadInvoices();
