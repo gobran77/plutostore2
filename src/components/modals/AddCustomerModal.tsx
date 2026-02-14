@@ -126,11 +126,10 @@ export const AddCustomerModal = ({ isOpen, onClose, onAdd }: AddCustomerModalPro
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                البريد الإلكتروني <span className="text-destructive">*</span>
+                البريد الإلكتروني (اختياري)
               </label>
               <input
                 type="email"
-                required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="example@email.com"
