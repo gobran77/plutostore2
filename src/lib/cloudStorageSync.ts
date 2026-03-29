@@ -19,9 +19,7 @@ export const syncCloudStorageNow = async (): Promise<void> => {
   return Promise.resolve();
 };
 
-export const startCloudStoragePolling = (): void => {
-  // Manual mode: no cloud polling.
-};
+export const startCloudStoragePolling = (): void => {};
 
 export const purgeCloudAppState = async (): Promise<void> => {
   const keysToDelete: string[] = [];
@@ -30,5 +28,9 @@ export const purgeCloudAppState = async (): Promise<void> => {
     if (key && key.startsWith('app_')) keysToDelete.push(key);
   }
   keysToDelete.forEach((key) => localStorage.removeItem(key));
+  return Promise.resolve();
+};
+
+export const purgeLegacyCustomersCacheDoc = async (): Promise<void> => {
   return Promise.resolve();
 };

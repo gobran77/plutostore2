@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { getCurrencySymbol } from '@/types/currency';
-import { CUSTOMER_ACCOUNTS_KEY } from '@/hooks/useCustomerPassword';
+import { updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 
 interface CustomerBalances {
   balance_sar: number;
@@ -80,17 +80,8 @@ export const AdjustBalanceModal = ({
         : currentBalance - adjustAmount;
 
       const balanceField = getBalanceField();
-
-      // Update locally in app_customer_accounts
-      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
-      const accounts = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(accounts)) throw new Error('invalid_accounts');
-
-      const idx = accounts.findIndex((a: any) => String(a?.id || '') === String(customer.id));
-      if (idx === -1) throw new Error('account_not_found');
-
-      accounts[idx] = { ...accounts[idx], [balanceField]: newBalance };
-      localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
+      const updated = await updateCustomerAccountRecord(String(customer.id), { [balanceField]: newBalance } as any);
+      if (!updated) throw new Error('account_not_found');
 
       toast.success(
         adjustmentType === 'add' 

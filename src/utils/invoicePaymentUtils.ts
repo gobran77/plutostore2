@@ -6,10 +6,14 @@ const PAYMENTS_STORAGE_KEY = 'app_payments';
 
 // Generate invoice number
 export const generateInvoiceNumber = (): string => {
-  const prefix = 'INV';
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `${prefix}-${timestamp}-${random}`;
+  const invoices = loadInvoices();
+  const maxSequence = invoices.reduce((max, invoice) => {
+    const match = String(invoice.invoiceNumber || '').match(/(\d+)$/);
+    const value = match ? Number(match[1]) : 0;
+    return Math.max(max, value);
+  }, 0);
+
+  return String(maxSequence + 1).padStart(3, '0');
 };
 
 // Create invoice from subscription

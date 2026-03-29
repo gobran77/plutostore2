@@ -18,9 +18,9 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { getCurrencySymbol } from '@/types/currency';
-import { CUSTOMER_ACCOUNTS_KEY, LocalCustomerAccount } from '@/hooks/useCustomerPassword';
 import { updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { addCustomerActivity } from '@/lib/customerActivityLog';
+import { saveInvoices, savePayments } from '@/utils/invoicePaymentUtils';
 
 interface Subscription {
   id: string;
@@ -84,31 +84,6 @@ export function AdminCustomerControls({
       case 'YER': return 'balance_yer';
       case 'USD': return 'balance_usd';
     }
-  };
-
-  const loadAccounts = (): LocalCustomerAccount[] => {
-    try {
-      const raw = localStorage.getItem(CUSTOMER_ACCOUNTS_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const saveAccounts = (accounts: LocalCustomerAccount[]) => {
-    localStorage.setItem(CUSTOMER_ACCOUNTS_KEY, JSON.stringify(accounts));
-  };
-
-  const adjustAccountBalance = (currency: 'SAR' | 'YER' | 'USD', newBalance: number) => {
-    const accounts = loadAccounts();
-    const idx = accounts.findIndex((a) => a.id === customerId);
-    if (idx === -1) return false;
-    const field = getBalanceField(currency);
-    (accounts[idx] as any)[field] = newBalance;
-    saveAccounts(accounts);
-    return true;
   };
 
   const updateLocalSubscription = (subId: string, patch: { service_name?: string; price?: number; end_date?: string }) => {
@@ -179,8 +154,11 @@ export function AdminCustomerControls({
         newBalance = amount;
       }
 
-      const ok = adjustAccountBalance(selectedCurrency, newBalance);
-      if (!ok) throw new Error('account_not_found');
+      const updated = await updateCustomerAccountRecord(
+        customerId,
+        { [getBalanceField(selectedCurrency)]: newBalance } as any
+      );
+      if (!updated) throw new Error('account_not_found');
       addCustomerActivity({
         customerId,
         type: adjustmentType === 'add' ? 'balance_add' : adjustmentType === 'subtract' ? 'balance_subtract' : 'balance_set',
@@ -266,10 +244,6 @@ export function AdminCustomerControls({
         balance: 0,
       } as any);
 
-      adjustAccountBalance('SAR', 0);
-      adjustAccountBalance('YER', 0);
-      adjustAccountBalance('USD', 0);
-
       // Delete all subscriptions for this customer
       try {
         const raw = localStorage.getItem('app_subscriptions');
@@ -294,7 +268,7 @@ export function AdminCustomerControls({
             const bySubscription = deletedSubscriptionIds.includes(String(inv?.subscriptionId || ''));
             return !byCustomer && !bySubscription;
           });
-          localStorage.setItem('app_invoices', JSON.stringify(updatedInvoices));
+          saveInvoices(updatedInvoices as any);
         }
 
         // Delete related payments for this customer/subscriptions
@@ -306,7 +280,7 @@ export function AdminCustomerControls({
             const bySubscription = deletedSubscriptionIds.includes(String(pay?.invoiceId || ''));
             return !byCustomerName && !bySubscription;
           });
-          localStorage.setItem('app_payments', JSON.stringify(updatedPayments));
+          savePayments(updatedPayments as any);
         }
       } catch {
         // ignore

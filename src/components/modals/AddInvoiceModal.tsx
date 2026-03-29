@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, FileText } from 'lucide-react';
 import { Invoice, Customer, InvoiceStatus } from '@/types';
 import { supportedCurrencies } from '@/types/currency';
+import { generateInvoiceNumber } from '@/utils/invoicePaymentUtils';
 
 interface AddInvoiceModalProps {
   isOpen: boolean;
@@ -26,14 +27,11 @@ export const AddInvoiceModal = ({ isOpen, onClose, onAdd, customers }: AddInvoic
 
   useEffect(() => {
     if (isOpen) {
-      const prefix = 'INV';
-      const timestamp = Date.now().toString().slice(-6);
-      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
       setFormData({
         customerId: '',
         customerName: '',
         subscriptionId: '',
-        invoiceNumber: `${prefix}-${timestamp}-${random}`,
+        invoiceNumber: generateInvoiceNumber(),
         amount: '',
         currency: 'SAR',
         tax: '0',

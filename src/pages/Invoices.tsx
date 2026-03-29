@@ -10,7 +10,13 @@ import { DeleteConfirmModal } from '@/components/modals/DeleteConfirmModal';
 import { Invoice, Customer } from '@/types';
 import { FileText, Download, Filter, Eye, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { loadInvoices, saveInvoices, updateInvoice, deleteInvoice } from '@/utils/invoicePaymentUtils';
+import {
+  deleteInvoice,
+  hydrateInvoicePaymentStorageFromCloud,
+  loadInvoices,
+  saveInvoices,
+  updateInvoice,
+} from '@/utils/invoicePaymentUtils';
 
 const CUSTOMERS_STORAGE_KEY = 'app_customers';
 
@@ -27,7 +33,14 @@ const Invoices = () => {
 
   // Load data from localStorage
   useEffect(() => {
-    setInvoices(loadInvoices());
+    const bootstrap = async () => {
+      await hydrateInvoicePaymentStorageFromCloud();
+      setInvoices(loadInvoices());
+    };
+    bootstrap().catch((error) => {
+      console.error('Failed to initialize invoices from cloud:', error);
+      setInvoices(loadInvoices());
+    });
 
     const savedCustomers = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
     if (savedCustomers) {

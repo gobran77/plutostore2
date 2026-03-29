@@ -16,6 +16,7 @@ interface AddSubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (subscription: Omit<Subscription, 'id' | 'status'>) => void;
+  initialSubscription?: Subscription | null;
   customers: Customer[];
   services: Service[];
   paymentMethods: PaymentMethodType[];
@@ -104,6 +105,7 @@ export const AddSubscriptionModal = ({
   isOpen, 
   onClose, 
   onAdd, 
+  initialSubscription,
   customers,
   services,
   paymentMethods 
@@ -150,9 +152,50 @@ export const AddSubscriptionModal = ({
     return filtered.length > 0 ? filtered : services;
   })();
 
+  const isEditing = Boolean(initialSubscription);
+
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
+      if (initialSubscription) {
+        const matchedCustomer = customers.find((c) => c.id === initialSubscription.customerId) || null;
+        const matchedPaymentMethod =
+          paymentMethods.find((method) => method.id === initialSubscription.paymentMethod?.id) || null;
+        const startValue = formatDateInput(new Date(initialSubscription.startDate));
+        const endValue = formatDateInput(new Date(initialSubscription.endDate));
+        const dueValue = initialSubscription.dueDate
+          ? formatDateInput(new Date(initialSubscription.dueDate))
+          : '';
+
+        setSelectedCustomer(matchedCustomer);
+        setSelectedPaymentMethod(matchedPaymentMethod);
+        setFormData({
+          duration: buildDurationFromDates(startValue, endValue),
+          autoRenew: initialSubscription.autoRenew,
+          currency: initialSubscription.currency || matchedCustomer?.currency || 'SAR',
+          discount: Number(initialSubscription.discount || 0),
+          paymentStatus: initialSubscription.paymentStatus,
+          paidAmount: Number(initialSubscription.paidAmount || 0),
+          deferredDays: dueValue ? buildDurationFromDates(startValue, dueValue) : 2,
+          paymentNotes: initialSubscription.paymentNotes || '',
+          subscriptionType: initialSubscription.subscriptionType || 'private',
+        });
+        setStartDateInput(startValue);
+        setEndDateInput(endValue);
+        setSubscriptionServices(
+          Array.isArray(initialSubscription.services) && initialSubscription.services.length > 0
+            ? initialSubscription.services.map((service, index) => ({
+                ...service,
+                id: service.id || `${index + 1}`,
+              }))
+            : [{ id: '1', serviceName: '', price: 0, cost: 0 }]
+        );
+        setSelectedLegacySharedServiceId(initialSubscription.services?.[0]?.serviceId || '');
+        setSelectedSlotId(initialSubscription.slotId || '');
+        setAvailableSlots([]);
+        return;
+      }
+
       const today = formatDateInput(new Date());
       setSelectedCustomer(null);
       setSelectedPaymentMethod(null);
@@ -174,7 +217,7 @@ export const AddSubscriptionModal = ({
       setSelectedSlotId('');
       setAvailableSlots([]);
     }
-  }, [isOpen]);
+  }, [isOpen, initialSubscription, customers, paymentMethods]);
 
   // Derive "shared slots" from legacy services in localStorage.
   useEffect(() => {
@@ -422,7 +465,7 @@ export const AddSubscriptionModal = ({
       
       <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-2xl mx-4 animate-scale-in border border-border max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-card z-10">
-          <h2 className="text-xl font-bold text-foreground">إضافة اشتراك جديد</h2>
+          <h2 className="text-xl font-bold text-foreground">{isEditing ? 'تعديل الاشتراك' : 'إضافة اشتراك جديد'}</h2>
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-muted transition-colors"
@@ -958,7 +1001,7 @@ export const AddSubscriptionModal = ({
               className="btn-primary flex-1"
               disabled={!selectedCustomer || subscriptionServices.every(s => !s.serviceName.trim())}
             >
-              إضافة الاشتراك
+              {isEditing ? 'حفظ التعديلات' : 'إضافة الاشتراك'}
             </button>
             <button type="button" onClick={onClose} className="btn-secondary">
               إلغاء

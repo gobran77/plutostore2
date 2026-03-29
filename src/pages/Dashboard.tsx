@@ -447,8 +447,8 @@ const Dashboard = () => {
               <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-destructive" />
               <h3 className="font-semibold text-destructive text-sm md:text-base">تنبيه: دفعات متأخرة السداد</h3>
             </div>
-            <div className="space-y-2">
-              {overduePayments.slice(0, 5).map((sub) => {
+            <div className="space-y-2 max-h-[32rem] overflow-y-auto pe-1">
+              {overduePayments.map((sub) => {
                 const remaining = sub.totalPrice - sub.paidAmount;
                 const daysOverdue = sub.dueDate 
                   ? Math.floor((today.getTime() - new Date(sub.dueDate).getTime()) / (1000 * 60 * 60 * 24))
@@ -475,7 +475,7 @@ const Dashboard = () => {
                   </div>
                 );
               })}
-              {overduePayments.length > 5 && (
+              {false && overduePayments.length > 5 && (
                 <p className="text-xs md:text-sm text-center text-muted-foreground">
                   و {overduePayments.length - 5} دفعات أخرى...
                 </p>

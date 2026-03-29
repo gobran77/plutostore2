@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Customer } from '@/types';
+import { loadInvoices, loadPayments, saveInvoices, savePayments } from '@/utils/invoicePaymentUtils';
+import { purgeLegacyCustomersCacheDoc } from '@/lib/cloudStorageSync';
 import {
   deleteCustomerAccountRecord,
   getCustomerAccounts,
@@ -121,6 +123,11 @@ const Customers = () => {
       
       setCustomers(customerData);
       updateCachedCustomers(customerData);
+      if (customerData.length === 0) {
+        purgeLegacyCustomersCacheDoc().catch((error) => {
+          console.error('Failed to purge legacy customers cache doc:', error);
+        });
+      }
     } catch (err) {
       console.error('Error fetching customers:', err);
       toast.error('حدث خطأ في تحميل العملاء');
@@ -151,8 +158,10 @@ const Customers = () => {
     if (!selectedCustomer) return;
 
     try {
+      const nextCustomers = customers.filter((c) => c.id !== selectedCustomer.id);
+
       // Remove from UI immediately for better UX
-      setCustomers(prevCustomers => prevCustomers.filter(c => c.id !== selectedCustomer.id));
+      setCustomers(nextCustomers);
       setIsDeleteModalOpen(false);
 
       // Remove from accounts (portal auth + balances)
@@ -160,6 +169,11 @@ const Customers = () => {
 
       // Remove from cached customers list
       removeFromArrayStorage('app_customers', (c) => String(c?.id || '') === String(selectedCustomer.id));
+      if (nextCustomers.length === 0) {
+        purgeLegacyCustomersCacheDoc().catch((error) => {
+          console.error('Failed to purge legacy customers cache doc:', error);
+        });
+      }
 
       // Remove all subscriptions for this customer
       removeFromArrayStorage('app_subscriptions', (s) => String(s?.customerId || '') === String(selectedCustomer.id));
@@ -189,6 +203,8 @@ const Customers = () => {
       // Remove invoices/payments that belong to this customer
       removeFromArrayStorage('app_invoices', (inv) => String(inv?.customerId || '') === String(selectedCustomer.id));
       removeFromArrayStorage('app_payments', (pay) => String(pay?.customerId || '') === String(selectedCustomer.id));
+      saveInvoices(loadInvoices());
+      savePayments(loadPayments());
 
       toast.success('تم حذف العميل بنجاح');
       setSelectedCustomer(null);

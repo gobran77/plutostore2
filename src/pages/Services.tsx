@@ -16,32 +16,16 @@ import { getCurrencySymbol } from '@/types/currency';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { db, firebaseProjectId } from '@/integrations/firebase/client';
-import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
 
 // Storage key for services
 const SERVICES_STORAGE_KEY = 'app_services';
 const CUSTOMERS_STORAGE_KEY = 'app_customers';
 const PAYMENT_METHODS_KEY = 'app_payment_methods';
 const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
-const SERVICE_SLOTS_COLLECTION = 'service_slots_items';
-
-type ServiceSlotRow = {
-  id?: string;
-  serviceId?: string;
-  serviceName?: string;
-  type?: string;
-  emailId?: string;
-  email?: string;
-  status?: string;
-  customerId?: string;
-  customerName?: string;
-  createdAt?: string;
-  updated_at?: string;
-};
 
 const Services = () => {
   const [services, setServices] = useState<Service[]>([]);
+  const [servicesHydrated, setServicesHydrated] = useState(false);
   const [dynamicServices, setDynamicServices] = useState<DynamicService[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
@@ -63,7 +47,6 @@ const Services = () => {
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'service' | 'account' | 'email' | 'dynamic'; id: string; name: string } | null>(null);
   const [editingDynamicService, setEditingDynamicService] = useState<DynamicService | undefined>();
-
   // View state
   const [viewMode, setViewMode] = useState<'services' | 'accounts' | 'emails'>('services');
 
@@ -72,7 +55,7 @@ const Services = () => {
   const [emailForm, setEmailForm] = useState({ email: '', password: '' });
   const [editEmailForm, setEditEmailForm] = useState({ email: '', password: '' });
 
-  // Load data on mount (Firestore first, then local fallback)
+  // Load data on mount (local only)
   useEffect(() => {
     const normalizeServices = (input: any[]): Service[] => (
       input.map((s: any) => ({
@@ -102,148 +85,21 @@ const Services = () => {
           : [],
       }))
     );
-
-    const mergeSlotsIntoServices = (baseServices: Service[], slots: ServiceSlotRow[]): Service[] => {
-      const next = baseServices.map((service) => ({
-        ...service,
-        accounts: Array.isArray(service.accounts)
-          ? service.accounts.map((account) => ({
-              ...account,
-              sharedEmails: Array.isArray(account.sharedEmails)
-                ? account.sharedEmails.map((email) => ({
-                    ...email,
-                    users: Array.isArray(email.users) ? [...email.users] : [],
-                  }))
-                : [],
-            }))
-          : [],
-      }));
-
-      const serviceById = new Map(next.map((service) => [String(service.id), service]));
-
-      slots.forEach((slot) => {
-        const serviceId = String(slot?.serviceId || '');
-        if (!serviceId) return;
-
-        let service = serviceById.get(serviceId);
-        if (!service) {
-          service = {
-            id: serviceId,
-            name: String(slot?.serviceName || serviceId),
-            defaultType: (slot?.type === 'private' ? 'private' : 'shared') as ServiceType,
-            pricing: [],
-            createdAt: new Date(slot?.createdAt || Date.now()),
-            accounts: [],
-          };
-          serviceById.set(serviceId, service);
-          next.unshift(service);
-        }
-
-        const accountType = (slot?.type === 'private' ? 'private' : 'shared') as ServiceType;
-        let account = service.accounts.find((a) => a.type === accountType);
-        if (!account) {
-          account = {
-            id: `acc_${service.id}_${accountType}`,
-            type: accountType,
-            sharedEmails: [],
-            createdAt: new Date(slot?.createdAt || Date.now()),
-          };
-          service.accounts.unshift(account);
-        }
-
-        const emailId = String(slot?.emailId || `eml_${service.id}_${String(slot?.email || 'shared')}`);
-        const emailValue = String(slot?.email || '');
-        let email = account.sharedEmails.find((e) => String(e.id) === emailId || (emailValue && e.email === emailValue));
-        if (!email) {
-          email = {
-            id: emailId,
-            email: emailValue,
-            password: '',
-            users: [],
-            addedAt: new Date(slot?.createdAt || Date.now()),
-          };
-          account.sharedEmails.unshift(email);
-        }
-
-        const isAssigned = String(slot?.status || '').toLowerCase() === 'assigned' || Boolean(slot?.customerId) || Boolean(slot?.customerName);
-        if (!isAssigned) return;
-
-        const userId = String(slot?.id || `${service.id}_${email.id}_${String(slot?.customerId || Date.now())}`);
-        const existingUser = email.users.find((u) => String(u.id) === userId);
-        if (existingUser) return;
-
-        email.users.unshift({
-          id: userId,
-          customerId: String(slot?.customerId || ''),
-          name: String(slot?.customerName || 'مستخدم'),
-          email: emailValue,
-          linkedAt: new Date(slot?.updated_at || slot?.createdAt || Date.now()),
-        });
-      });
-
-      return next;
-    };
-
     const loadServices = async () => {
-      const getLocalServices = (): Service[] => {
-        const saved = localStorage.getItem(SERVICES_STORAGE_KEY);
-        if (!saved) return [];
-        try {
-          return normalizeServices(JSON.parse(saved));
-        } catch {
-          return [];
-        }
-      };
-
-      try {
-        if (db) {
-          const [servicesSnap, slotsSnap] = await Promise.all([
-            getDocs(collection(db, 'service_catalog_items')),
-            getDocs(collection(db, SERVICE_SLOTS_COLLECTION)),
-          ]);
-
-          const fromFirestore = servicesSnap.docs.map((d) => {
-            const row = d.data() as any;
-            return { ...row, id: String(row?.id || d.id) };
-          });
-          const slotRows = slotsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as ServiceSlotRow) }));
-
-          if (fromFirestore.length > 0) {
-            const normalized = normalizeServices(fromFirestore);
-            const localServices = getLocalServices();
-            const localById = new Map(localServices.map((s) => [String(s.id), s]));
-
-            // Keep local accounts/emails when Firestore document doesn't include them.
-            const merged = normalized.map((service) => {
-              const local = localById.get(String(service.id));
-              if (!local) return service;
-              const hasCloudAccounts = Array.isArray(service.accounts) && service.accounts.length > 0;
-              return hasCloudAccounts ? service : { ...service, accounts: local.accounts || [] };
-            });
-
-            const mergedWithSlots = mergeSlotsIntoServices(merged, slotRows);
-            setServices(mergedWithSlots);
-            localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(mergedWithSlots));
-            return;
-          }
-
-          if (!localStorage.getItem(SERVICES_STORAGE_KEY)) {
-            toast.warning(`لا توجد خدمات في Firestore (project: ${firebaseProjectId || 'unknown'})`);
-          }
-        }
-      } catch (e) {
-        console.error('Error loading services from Firestore:', e);
-        const code = (e as any)?.code ? String((e as any).code) : 'unknown';
-        toast.error(`فشل قراءة الخدمات من Firestore (${code}) - project: ${firebaseProjectId || 'unknown'}`);
+      const savedServices = localStorage.getItem(SERVICES_STORAGE_KEY);
+      if (!savedServices) {
+        setServices([]);
+        setServicesHydrated(true);
+        return;
       }
 
-      const savedServices = localStorage.getItem(SERVICES_STORAGE_KEY);
-      if (!savedServices) return;
       try {
         const parsed = JSON.parse(savedServices);
         setServices(normalizeServices(parsed));
       } catch (e) {
         console.error('Error loading services from localStorage:', e);
+      } finally {
+        setServicesHydrated(true);
       }
     };
 
@@ -295,147 +151,13 @@ const Services = () => {
 
   // Save services to localStorage
   useEffect(() => {
+    if (!servicesHydrated) return;
     if (services.length > 0) {
       localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(services));
     } else {
       localStorage.removeItem(SERVICES_STORAGE_KEY);
     }
-  }, [services]);
-
-  // Persist legacy services to Firestore collection used for manual services.
-  useEffect(() => {
-    if (!db) return;
-
-      const toIso = (value: any) =>
-        value instanceof Date ? value.toISOString() : new Date(value || Date.now()).toISOString();
-
-    const serialize = (service: Service) => ({
-      ...service,
-      createdAt: toIso(service.createdAt),
-      accounts: Array.isArray(service.accounts)
-        ? service.accounts.map((a) => ({
-            ...a,
-            createdAt: toIso(a.createdAt),
-            sharedEmails: Array.isArray(a.sharedEmails)
-              ? a.sharedEmails.map((e) => ({
-                  ...e,
-                  addedAt: toIso(e.addedAt),
-                  users: Array.isArray(e.users)
-                    ? e.users.map((u) => ({ ...u, linkedAt: toIso(u.linkedAt) }))
-                    : [],
-                }))
-              : [],
-          }))
-        : [],
-    });
-
-    let cancelled = false;
-    const syncServices = async () => {
-      try {
-        const [servicesSnapshot, slotsSnapshot] = await Promise.all([
-          getDocs(collection(db, 'service_catalog_items')),
-          getDocs(collection(db, SERVICE_SLOTS_COLLECTION)),
-        ]);
-        if (cancelled) return;
-
-        const nextIds = new Set(services.map((s) => String(s.id)));
-        await Promise.all(
-          services.map((service) =>
-            setDoc(doc(db, 'service_catalog_items', String(service.id)), serialize(service), { merge: true })
-          )
-        );
-
-        const deletes: Promise<void>[] = [];
-        servicesSnapshot.docs.forEach((d) => {
-          if (!nextIds.has(d.id)) {
-            deletes.push(deleteDoc(doc(db, 'service_catalog_items', d.id)));
-          }
-        });
-        if (deletes.length > 0) {
-          await Promise.all(deletes);
-        }
-
-        // Build expected slot ids from current in-app services state.
-        const expectedSlotIds = new Set<string>();
-        const slotWrites: Promise<void>[] = [];
-        services.forEach((service) => {
-          service.accounts.forEach((account) => {
-            if (account.type !== 'shared') return;
-            account.sharedEmails.forEach((sharedEmail) => {
-              // Always keep one base "available" slot row for each shared email.
-              const baseSlotId = `slot_${service.id}_${sharedEmail.id}`;
-              expectedSlotIds.add(baseSlotId);
-              slotWrites.push(
-                setDoc(
-                  doc(db, SERVICE_SLOTS_COLLECTION, baseSlotId),
-                  {
-                    id: baseSlotId,
-                    serviceId: String(service.id),
-                    serviceName: String(service.name || ''),
-                    type: account.type,
-                    emailId: String(sharedEmail.id),
-                    email: String(sharedEmail.email || ''),
-                    status: 'available',
-                    customerId: '',
-                    customerName: '',
-                    createdAt: toIso(sharedEmail.addedAt),
-                    updated_at: new Date().toISOString(),
-                  },
-                  { merge: true }
-                )
-              );
-
-              sharedEmail.users.forEach((user) => {
-                const slotId = String(user.id || `${baseSlotId}_usr_${Date.now()}`);
-                expectedSlotIds.add(slotId);
-                slotWrites.push(
-                  setDoc(
-                    doc(db, SERVICE_SLOTS_COLLECTION, slotId),
-                    {
-                        id: slotId,
-                        serviceId: String(service.id),
-                        serviceName: String(service.name || ''),
-                        type: account.type,
-                        emailId: String(sharedEmail.id),
-                        email: String(sharedEmail.email || ''),
-                        status: 'assigned',
-                        customerId: String(user.customerId || ''),
-                        customerName: String(user.name || ''),
-                        createdAt: toIso(user.linkedAt),
-                        updated_at: new Date().toISOString(),
-                      },
-                      { merge: true }
-                    )
-                  );
-              });
-            });
-          });
-        });
-
-        // Remove stale slots (deleted service / deleted email / deleted user).
-        const slotDeletes: Promise<void>[] = [];
-        slotsSnapshot.docs.forEach((d) => {
-          if (!expectedSlotIds.has(d.id)) {
-            slotDeletes.push(deleteDoc(doc(db, SERVICE_SLOTS_COLLECTION, d.id)));
-          }
-        });
-
-        if (slotWrites.length > 0) {
-          await Promise.all(slotWrites);
-        }
-        if (slotDeletes.length > 0) {
-          await Promise.all(slotDeletes);
-        }
-      } catch (error) {
-        console.error('Failed to sync services to Firestore:', error);
-      }
-    };
-
-    void syncServices();
-    return () => {
-      cancelled = true;
-    };
-  }, [services]);
+  }, [services, servicesHydrated]);
 
   // Save dynamic services to localStorage
   useEffect(() => {
@@ -1631,3 +1353,6 @@ const Services = () => {
 };
 
 export default Services;
+
+
+

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Header } from '@/components/layout/Header';
 import { DataTable } from '@/components/common/DataTable';
@@ -26,12 +26,8 @@ import { subtractFromBalance } from '@/types/currency';
 import { getCustomerAccounts, updateCustomerAccountRecord } from '@/lib/customerAccountsStorage';
 import { addCustomerActivity } from '@/lib/customerActivityLog';
 import { fixTextEncoding } from '@/lib/textEncoding';
-import { CLOUD_STATE_UPDATED_EVENT } from '@/lib/cloudStorageSync';
-import { db } from '@/integrations/firebase/client';
-import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
 
 const SUBSCRIPTIONS_STORAGE_KEY = 'app_subscriptions';
-const SUBSCRIPTIONS_COLLECTION = 'service_subscriptions_items';
 const SERVICES_STORAGE_KEY = 'app_services';
 const CUSTOMERS_STORAGE_KEY = 'app_customers';
 const PAYMENT_METHODS_STORAGE_KEY = 'app_payment_methods';
@@ -52,6 +48,49 @@ const getCustomerBalanceField = (currency: string): CustomerBalanceField | null 
 };
 
 type FilterStatus = 'all' | SubscriptionStatus;
+
+const getDerivedSubscriptionStatus = (subscription: Subscription): SubscriptionStatus => {
+  if (subscription.status === 'canceled' || subscription.status === 'paused') {
+    return subscription.status;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const endDate = new Date(subscription.endDate);
+  endDate.setHours(0, 0, 0, 0);
+
+  if (endDate < today) {
+    return 'expired';
+  }
+
+  const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 7) {
+    return 'expiring_soon';
+  }
+
+  return 'active';
+};
+
+const getSubscriptionMonths = (subscription: Subscription): string[] => {
+  const start = new Date(subscription.startDate);
+  const end = new Date(subscription.endDate);
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  const months: string[] = [];
+
+  while (cursor <= last) {
+    months.push(
+      cursor.toLocaleDateString('ar-SA', {
+        month: 'long',
+        year: 'numeric',
+      })
+    );
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return months;
+};
 
 const getPaymentStatusBadge = (status: PaymentStatus, dueDate?: Date) => {
   const now = new Date();
@@ -107,6 +146,7 @@ const Subscriptions = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [whatsAppData, setWhatsAppData] = useState<{ customerName: string; whatsappNumber: string; message: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [subscriptionsHydrated, setSubscriptionsHydrated] = useState(false);
@@ -152,43 +192,6 @@ const Subscriptions = () => {
   };
 
   const loadSubscriptions = async () => {
-    const loadLocalSubscriptions = (): Subscription[] => {
-      const savedSubscriptions = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
-      if (!savedSubscriptions) return [];
-      try {
-        const parsed = JSON.parse(savedSubscriptions);
-        return (Array.isArray(parsed) ? parsed : []).map((s: any) => normalizeSubscription(s));
-      } catch {
-        return [];
-      }
-    };
-
-    if (db) {
-      try {
-        const snapshot = await getDocs(collection(db, SUBSCRIPTIONS_COLLECTION));
-        if (!snapshot.empty) {
-          const rows = snapshot.docs.map((d) => ({ ...d.data(), id: String((d.data() as any)?.id || d.id) }));
-          const cloudSubscriptions = rows.map(normalizeSubscription);
-          const localSubscriptions = loadLocalSubscriptions();
-          const mergedById = new Map<string, Subscription>();
-
-          localSubscriptions.forEach((item) => mergedById.set(String(item.id), item));
-          cloudSubscriptions.forEach((item) => mergedById.set(String(item.id), item));
-
-          const subscriptionsWithDates = Array.from(mergedById.values()).sort(
-            (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-          );
-
-          setSubscriptions(subscriptionsWithDates);
-          setSubscriptionsHydrated(true);
-          localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(subscriptionsWithDates));
-          return;
-        }
-      } catch (e) {
-        console.error('Error loading subscriptions from Firestore:', e);
-      }
-    }
-
     const savedSubscriptions = localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY);
     if (!savedSubscriptions) {
       setSubscriptions([]);
@@ -295,38 +298,9 @@ const Subscriptions = () => {
       }
     };
 
-    const onCloudStateUpdated = (event: Event) => {
-      const customEvent = event as CustomEvent<{ keys?: string[] }>;
-      const changed = new Set(customEvent?.detail?.keys || []);
-      if (changed.has(SUBSCRIPTIONS_STORAGE_KEY)) {
-        void loadSubscriptions();
-      }
-      if (changed.has(CUSTOMERS_STORAGE_KEY)) {
-        loadCustomers();
-      }
-      if (changed.has(SERVICES_STORAGE_KEY)) {
-        loadServices();
-      }
-      if (changed.has(PAYMENT_METHODS_STORAGE_KEY)) {
-        const raw = localStorage.getItem(PAYMENT_METHODS_STORAGE_KEY);
-        if (!raw) {
-          setPaymentMethods(defaultPaymentMethods);
-          return;
-        }
-        try {
-          const parsed = JSON.parse(raw);
-          setPaymentMethods(parsed);
-        } catch {
-          setPaymentMethods(defaultPaymentMethods);
-        }
-      }
-    };
-
     window.addEventListener('storage', onStorage);
-    window.addEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
     return () => {
       window.removeEventListener('storage', onStorage);
-      window.removeEventListener(CLOUD_STATE_UPDATED_EVENT, onCloudStateUpdated as EventListener);
     };
   }, []);
 
@@ -349,49 +323,6 @@ const Subscriptions = () => {
     const nextSerialized = JSON.stringify(subscriptions);
     if (localStorage.getItem(SUBSCRIPTIONS_STORAGE_KEY) === nextSerialized) return;
     localStorage.setItem(SUBSCRIPTIONS_STORAGE_KEY, nextSerialized);
-  }, [subscriptions, subscriptionsHydrated]);
-
-  useEffect(() => {
-    if (!subscriptionsHydrated || !db) return;
-
-    const toIso = (value: any) =>
-      value instanceof Date ? value.toISOString() : new Date(value || Date.now()).toISOString();
-
-    const serialize = (sub: Subscription) => ({
-      ...sub,
-      startDate: toIso(sub.startDate),
-      endDate: toIso(sub.endDate),
-      dueDate: sub.dueDate ? toIso(sub.dueDate) : null,
-      updated_at: new Date().toISOString(),
-    });
-
-    let cancelled = false;
-    const syncSubscriptions = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, SUBSCRIPTIONS_COLLECTION));
-        if (cancelled) return;
-
-        const nextIds = new Set(subscriptions.map((s) => String(s.id)));
-        await Promise.all(
-          subscriptions.map((sub) =>
-            setDoc(doc(db, SUBSCRIPTIONS_COLLECTION, String(sub.id)), serialize(sub), { merge: true })
-          )
-        );
-
-        const deletes: Promise<void>[] = [];
-        snapshot.docs.forEach((d) => {
-          if (!nextIds.has(d.id)) deletes.push(deleteDoc(doc(db, SUBSCRIPTIONS_COLLECTION, d.id)));
-        });
-        if (deletes.length > 0) await Promise.all(deletes);
-      } catch (error) {
-        console.error('Failed to sync subscriptions to Firestore:', error);
-      }
-    };
-
-    void syncSubscriptions();
-    return () => {
-      cancelled = true;
-    };
   }, [subscriptions, subscriptionsHydrated]);
 
   // Send WhatsApp notification to customer
@@ -444,7 +375,8 @@ const Subscriptions = () => {
       id: Date.now().toString(),
       status: 'active',
     };
-    
+    console.log('SAVING_SUBSCRIPTION', newSubscription);
+
     // Get customer WhatsApp number
     const customer = customers.find(c => c.id === subscriptionData.customerId);
     const customerWhatsapp = customer?.whatsapp?.replace(/[^0-9]/g, '') || '';
@@ -483,6 +415,44 @@ const Subscriptions = () => {
     });
     
     toast.success('تمت إضافة الاشتراك وإنشاء الفاتورة بنجاح');
+  };
+
+  const handleUpdateSubscription = async (subscriptionData: Omit<Subscription, 'id' | 'status'>) => {
+    if (!editingSubscription) return;
+
+    const updatedSubscription: Subscription = {
+      ...editingSubscription,
+      ...subscriptionData,
+      id: editingSubscription.id,
+      status: editingSubscription.status,
+    };
+
+    setSubscriptions((prev) =>
+      prev.map((subscription) =>
+        subscription.id === editingSubscription.id ? updatedSubscription : subscription
+      )
+    );
+
+    addCustomerActivity({
+      customerId: updatedSubscription.customerId,
+      type: 'subscription_update',
+      title: 'تم تعديل اشتراك',
+      description: updatedSubscription.services.map((s) => s.serviceName).join('، ') || 'اشتراك',
+      amount: Number(updatedSubscription.totalPrice || 0),
+      currency: updatedSubscription.currency,
+      meta: {
+        subscriptionId: updatedSubscription.id,
+      },
+    });
+
+    setIsModalOpen(false);
+    setEditingSubscription(null);
+    toast.success('تم تحديث الاشتراك بنجاح');
+  };
+
+  const openEditModal = (subscription: Subscription) => {
+    setEditingSubscription(subscription);
+    setIsModalOpen(true);
   };
 
   const handleDeleteSubscription = async () => {
@@ -556,7 +526,32 @@ const Subscriptions = () => {
   // Filter subscriptions based on selected status
   const filteredSubscriptions = filterStatus === 'all'
     ? subscriptions
-    : subscriptions.filter(s => s.status === filterStatus);
+    : subscriptions.filter(s => getDerivedSubscriptionStatus(s) === filterStatus);
+
+  const serviceSubscriptionGroups = (() => {
+    const groups = new Map<string, Subscription[]>();
+
+    filteredSubscriptions.forEach((subscription) => {
+      if (!Array.isArray(subscription.services) || subscription.services.length === 0) {
+        const uncategorized = groups.get('بدون خدمة') || [];
+        uncategorized.push(subscription);
+        groups.set('بدون خدمة', uncategorized);
+        return;
+      }
+
+      subscription.services.forEach((service) => {
+        const serviceName = String(service.serviceName || '').trim() || 'بدون خدمة';
+        const existing = groups.get(serviceName) || [];
+        existing.push(subscription);
+        groups.set(serviceName, existing);
+      });
+    });
+
+    return Array.from(groups.entries()).map(([serviceName, items]) => ({
+      serviceName,
+      items,
+    }));
+  })();
 
   const columns = [
     {
@@ -596,19 +591,35 @@ const Subscriptions = () => {
     {
       key: 'dates',
       header: 'فترة الاشتراك',
-      render: (sub: Subscription) => (
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            {sub.startDate.toLocaleDateString('ar-SA')} - {sub.endDate.toLocaleDateString('ar-SA')}
-          </span>
-        </div>
-      ),
+      render: (sub: Subscription) => {
+        const months = getSubscriptionMonths(sub);
+
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {sub.startDate.toLocaleDateString('ar-SA')} - {sub.endDate.toLocaleDateString('ar-SA')}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {months.map((month) => (
+                <span
+                  key={`${sub.id}-${month}`}
+                  className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
+                >
+                  {month}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: 'status',
       header: 'الحالة',
-      render: (sub: Subscription) => <StatusBadge status={sub.status} />,
+      render: (sub: Subscription) => <StatusBadge status={getDerivedSubscriptionStatus(sub)} />,
     },
     {
       key: 'paymentStatus',
@@ -693,7 +704,8 @@ const Subscriptions = () => {
             return;
           }
           
-          const statusText = sub.status === 'active' ? 'نشط' : sub.status === 'expiring_soon' ? 'قريب من الانتهاء' : sub.status === 'expired' ? 'منتهي' : sub.status;
+          const derivedStatus = getDerivedSubscriptionStatus(sub);
+          const statusText = derivedStatus === 'active' ? 'نشط' : derivedStatus === 'expiring_soon' ? 'قريب من الانتهاء' : derivedStatus === 'expired' ? 'منتهي' : derivedStatus;
           const paymentText = sub.paymentStatus === 'paid' ? 'مدفوع' : sub.paymentStatus === 'partial' ? `جزئي (${sub.paidAmount} من ${sub.totalPrice})` : 'آجل';
           
           const message = [
@@ -745,7 +757,7 @@ const Subscriptions = () => {
               {
                 label: 'تعديل',
                 icon: Edit,
-                onClick: () => console.log('Edit:', sub),
+                onClick: () => openEditModal(sub),
               },
               {
                 label: 'حذف',
@@ -761,9 +773,9 @@ const Subscriptions = () => {
     },
   ];
 
-  const activeCount = subscriptions.filter(s => s.status === 'active').length;
-  const expiringCount = subscriptions.filter(s => s.status === 'expiring_soon').length;
-  const expiredCount = subscriptions.filter(s => s.status === 'expired').length;
+  const activeCount = subscriptions.filter(s => getDerivedSubscriptionStatus(s) === 'active').length;
+  const expiringCount = subscriptions.filter(s => getDerivedSubscriptionStatus(s) === 'expiring_soon').length;
+  const expiredCount = subscriptions.filter(s => getDerivedSubscriptionStatus(s) === 'expired').length;
   const deferredCount = subscriptions.filter(s => s.paymentStatus === 'deferred' || s.paymentStatus === 'partial').length;
   const totalDebt = subscriptions
     .filter(s => s.paymentStatus !== 'paid')
@@ -776,7 +788,10 @@ const Subscriptions = () => {
         subtitle={`${subscriptions.length} اشتراك`}
         showAddButton
         addButtonLabel="إضافة اشتراك"
-        onAddClick={() => setIsModalOpen(true)}
+        onAddClick={() => {
+          setEditingSubscription(null);
+          setIsModalOpen(true);
+        }}
       />
 
       <div className="p-6 space-y-6 animate-fade-in">
@@ -858,19 +873,44 @@ const Subscriptions = () => {
           </div>
         </div>
 
-        {/* Table */}
-        <DataTable
-          columns={columns}
-          data={filteredSubscriptions}
-          keyExtractor={(sub) => sub.id}
-        />
+        {/* Tables grouped by service */}
+        {serviceSubscriptionGroups.length === 0 ? (
+          <DataTable
+            columns={columns}
+            data={[]}
+            keyExtractor={(sub) => sub.id}
+            emptyMessage="لا توجد اشتراكات ضمن هذا التصنيف"
+          />
+        ) : (
+          <div className="space-y-6">
+            {serviceSubscriptionGroups.map((group) => (
+              <section key={group.serviceName} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">{group.serviceName}</h3>
+                    <p className="text-sm text-muted-foreground">{group.items.length} اشتراك</p>
+                  </div>
+                </div>
+                <DataTable
+                  columns={columns}
+                  data={group.items}
+                  keyExtractor={(sub) => `${group.serviceName}-${sub.id}`}
+                />
+              </section>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Add Subscription Modal */}
       <AddSubscriptionModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAdd={handleAddSubscription}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingSubscription(null);
+        }}
+        onAdd={editingSubscription ? handleUpdateSubscription : handleAddSubscription}
+        initialSubscription={editingSubscription}
         customers={customers}
         services={services}
         paymentMethods={paymentMethods}
@@ -907,3 +947,5 @@ const Subscriptions = () => {
 };
 
 export default Subscriptions;
+
+
