@@ -8,7 +8,7 @@ export default defineConfig(async ({ mode }) => {
 
   return {
     // GitHub Pages serves from /<repo>/, so we need a different base path there.
-    base: mode === "github" ? "/plutostore/" : "/",
+    base: mode === "github" ? "/plutostore2/" : "/",
     server: {
       host: "::",
       port: 8080,
